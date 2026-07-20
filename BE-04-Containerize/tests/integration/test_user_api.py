@@ -1,6 +1,6 @@
 import uuid
 
-from tests.integration.sample_data import ADA_ID, ALAN_ID, GRACE_ID
+from tests.integration.sample_data import ADA_ID, ALAN_ID, GRACE_ID, TASK_SHIP_RELEASE_ID
 
 
 def test_list_users_returns_seeded_users(client, seeded_db):
@@ -55,7 +55,7 @@ def test_create_user_rejects_extra_field(client):
 
 
 def test_update_user_changes_only_provided_fields(client, seeded_db):
-    response = client.put(f"/user/{ALAN_ID}", json={"email": "alan.turing@example.com"})
+    response = client.patch(f"/user/{ALAN_ID}", json={"email": "alan.turing@example.com"})
 
     assert response.status_code == 200
     body = response.json()
@@ -80,3 +80,16 @@ def test_unassign_then_delete_user_succeeds(client, seeded_db):
 
     get_response = client.get(f"/user/{ADA_ID}")
     assert get_response.status_code == 404
+
+
+def test_delete_user_with_only_done_task_succeeds(client, seeded_db):
+    """Grace only owns a DONE task; that's a historical record, not an active assignment,
+    so it must not block deletion (the FK is ON DELETE SET NULL)."""
+    delete_response = client.delete(f"/user/{GRACE_ID}")
+    assert delete_response.status_code == 204
+
+    task_response = client.get(f"/task/{TASK_SHIP_RELEASE_ID}")
+    assert task_response.status_code == 200
+    body = task_response.json()
+    assert body["status"] == "DONE"
+    assert body["assignee_user_id"] is None

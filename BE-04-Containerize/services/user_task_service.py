@@ -18,8 +18,12 @@ class UserTaskService:
         return self.task_service.assign_task(task_id, assignee_user_id)
 
     def has_assigned_tasks(self, user_id: uuid.UUID) -> bool:
+        # DONE tasks are a historical record, not an active assignment, so they don't block
+        # deletion. Safe only because tasks.assignee_user_id is ON DELETE SET NULL (changeset
+        # 004) -- if that FK is ever changed back to the default RESTRICT, deleting a user with
+        # only DONE tasks would pass this check and then fail with a raw FK-violation 500.
         tasks = self.task_service.list_tasks(assignee_user_id=user_id)
-        return len(tasks) > 0
+        return any(task.status != "DONE" for task in tasks)
 
     def unassign_user_tasks(self, user_id: uuid.UUID) -> int | None:
         user = self.user_service.get_user_by_id(user_id)
@@ -30,6 +34,8 @@ class UserTaskService:
         updated_count = 0
 
         for task in tasks:
+            if task.status == "DONE":
+                continue
             task = self.task_service.unassign_task(task.id)
             if task is not None:
                 updated_count += 1

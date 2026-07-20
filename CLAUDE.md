@@ -75,14 +75,17 @@ Request flow: `api/routes/*` → `services/*` → `repositories/*` (via a `*_rep
 
 Deliberately split into narrow single-purpose endpoints instead of one generic PATCH:
 
-- `POST /task` — create with only `name` + `description`; all lifecycle fields default.
-- `PATCH /task/{task_id}` — metadata only (`name`, `description`, `estimated_duration_days`, `start_date`, `end_date`).
-- `PATCH /task/{task_id}/assignee` — assignment only.
-- `PATCH /task/{task_id}/status` — status transition only.
+- `POST /task` — create with `name` (mandatory) plus `description`, `estimated_duration_days` (optional). `start_date`/`end_date` and status/assignee are not accepted here and always default.
+- `PATCH /task/{task_id}` — metadata only (`name`, `description`, `estimated_duration_days`). `start_date`/`end_date` are **not** patchable — see below.
+- `PATCH /task/{task_id}/assignee` — assign a `PLANNED` task, or reassign an already-`ASSIGNED` task to a different user. Touches only `assignee_user_id`/`status`, never `start_date`/`end_date`. `409` if the task is `STARTED`/`FAILED`/`DONE` — deassign first.
+- `DELETE /task/{task_id}/assignee` — deassign a single task only (does not touch the rest of that user's assignments).
+- `PATCH /task/{task_id}/status` — status transition only. This is the **sole** place `start_date`/`end_date` are ever set.
 
 Allowed transitions: `PLANNED → ASSIGNED → STARTED → DONE`, `STARTED → FAILED`, `FAILED → STARTED`. An invalid transition returns `409 Conflict` with a business-rule message — do not let routes or repositories bypass this check.
 
-A task has a single current `assignee_user_id`. `POST /users/{user_id}/tasks/unassign` clears a user's assignments back to `PLANNED`; `DELETE /user/{user_id}` is rejected (`409`) while the user still has assigned tasks — this check lives in `UserTaskService`, not `UserService`.
+`start_date`/`end_date` are business-process-owned, not client-editable metadata — this was a real design bug that got fixed (see Gotchas): `-> STARTED` sets `start_date` to now and clears `end_date` (covers both the first `ASSIGNED -> STARTED` move and a `FAILED -> STARTED` retry); `-> DONE`/`-> FAILED` sets `end_date` to now; `-> ASSIGNED` sets neither. `TaskService.change_status` is the only place that writes these fields going forward — do not let `update_task`, `assign_task`, or any route accept them again.
+
+A task has a single current `assignee_user_id`. Deassigning (single-task `DELETE .../assignee` or bulk `POST /users/{user_id}/tasks/unassign`) resets a `PLANNED`/`ASSIGNED`/`STARTED`/`FAILED` task back to `PLANNED`, clearing `assignee_user_id`/`start_date`/`end_date`. A `DONE` task is the deliberate exception: it's treated as a historical record, not an active assignment — deassigning it only clears `assignee_user_id`, while `status`, `start_date`, and `end_date` are all preserved. `TaskService.assign_task`/`unassign_task` enforce this; do not let a route or the bulk path bypass it. `UserTaskService.has_assigned_tasks` (which gates `DELETE /user/{user_id}` with `409`) and the bulk unassign loop both count only *active* (non-`DONE`) assignments — a user who only owns `DONE` tasks can be deleted directly. That's safe because the `tasks.assignee_user_id` FK (`fk_tasks_assignee_user`, changeset `004_task_assignee_fk_on_delete_set_null.sql`) is `ON DELETE SET NULL`, so deleting such a user automatically nulls the reference on their completed tasks instead of erroring or requiring a prior cleanup step.
 
 ### Migrations (Liquibase)
 
@@ -98,10 +101,12 @@ pytest
 
 - `tests/unit/` — services tested against in-memory fakes of the repository ports (`tests/unit/fakes.py`), no DB.
 - `tests/integration/` — builds a real `<POSTGRES_DB>_test` database by replaying the actual Liquibase changeset files (not `Base.metadata.create_all()` from `models.py`), seeds a fixed dataset (`tests/fixtures/sample_data.json`), and drives the app through FastAPI's `TestClient`. Each test rolls back its own transaction (see `tests/conftest.py`), so tests never see each other's writes.
-- Replaying the real changesets is deliberate: it's what caught (and, in `tests/integration/test_task_api.py::test_get_task_includes_lifecycle_timestamps`, still guards) drift between `models.py` and the migration files — see the Gotchas note on changeset 003 below.
+- Replaying the real changesets is deliberate: it's what caught (and, in `tests/integration/test_task_api.py::test_get_task_includes_start_and_end_date`, still guards) drift between `models.py` and the migration files — see the Gotchas note on changeset 003 below.
 
 ### Gotchas
 
-- `models.py`'s `Task` model and the migrations that create the `tasks` table can drift silently if a new column is added to one but not the other — changeset `002_create_tasks_tables.sql` originally didn't create `assigned_at`/`started_at`/`finished_at`/`failed_at`, which `models.py` already declared; this surfaced as a `psycopg2.errors.UndefinedColumn` at insert time. Fixed via a new changeset (`003_add_task_lifecycle_timestamps.sql`) — never edit an already-applied changeset in place, since Liquibase checksum-validates them; always add a new one.
+- `models.py`'s `Task` model and the migrations that create the `tasks` table can drift silently if a new column is added to one but not the other — changeset `002_create_tasks_tables.sql` originally didn't create `assigned_at`/`started_at`/`finished_at`/`failed_at`, which `models.py` already declared; this surfaced as a `psycopg2.errors.UndefinedColumn` at insert time. Fixed via a new changeset (`003_add_task_lifecycle_timestamps.sql`) — never edit an already-applied changeset in place, since Liquibase checksum-validates them; always add a new one. (Those four columns were later dropped entirely — see the next Gotcha — but the "add a new changeset, never edit one in place" rule still applies to every schema change, including that removal, which is changeset `005`.)
+- Those `assigned_at`/`started_at`/`finished_at`/`failed_at` columns turned out to be a design mistake in their own right: `start_date`/`end_date` already existed as a second, independently-editable pair of task dates, so the table carried two parallel mechanisms for the same concept — one client-editable via `PATCH`, one business-process-driven. Resolved by dropping the `*_at` quartet (changeset `005_drop_task_lifecycle_at_columns.sql`) and making `start_date`/`end_date` the sole date fields, set exclusively by `TaskService.change_status` (see the Task lifecycle section above). If you're ever tempted to add a task date field, first check whether `start_date`/`end_date` can already express it — a second date pair is exactly how this mistake happened the first time.
 - Changing Postgres credentials in `.env` does not take effect against an existing volume — run `docker compose down -v` then bring `db` back up before re-migrating.
 - If `web` can't find tables, check that `db-migrate` actually completed (`docker compose up --build db-migrate`) before assuming an app-level bug.
+- `UserTaskService.has_assigned_tasks` and the bulk-unassign loop must keep excluding `DONE` tasks — treating a completed task as an "active assignment" would either permanently block deleting anyone who ever finished a task, or silently reset that task back to `PLANNED` and erase `end_date` just to unblock the delete. If the FK on `tasks.assignee_user_id` is ever changed away from `ON DELETE SET NULL`, this logic needs to be revisited together, since they were designed as a pair.

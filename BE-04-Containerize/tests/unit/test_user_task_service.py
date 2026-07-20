@@ -26,6 +26,13 @@ def make_task(task_service: TaskService, name: str = "Task"):
     return task_service.create_task(TaskCreateDTO(name=name, description=None))
 
 
+def force_status(task_service: TaskService, task_id, status: str) -> None:
+    """Directly mutate a task's stored status, bypassing the state machine, to set up a scenario."""
+    existing = task_service.task_repository.get_by_id(str(task_id))
+    existing.status = status
+    task_service.task_repository.update(existing)
+
+
 def test_assign_user_to_task_success(services):
     coordinator, user_service, task_service = services
     user = make_user(user_service)
@@ -75,3 +82,30 @@ def test_unassign_user_tasks_unknown_user_returns_none(services):
     coordinator, _, _ = services
 
     assert coordinator.unassign_user_tasks(uuid.uuid4()) is None
+
+
+def test_has_assigned_tasks_ignores_done_tasks(services):
+    coordinator, user_service, task_service = services
+    user = make_user(user_service)
+    task = make_task(task_service)
+    coordinator.assign_user_to_task(task.id, user.id)
+    force_status(task_service, task.id, "DONE")
+
+    assert coordinator.has_assigned_tasks(user.id) is False
+
+
+def test_unassign_user_tasks_skips_done_tasks(services):
+    coordinator, user_service, task_service = services
+    user = make_user(user_service)
+    active_task = make_task(task_service, name="Active")
+    done_task = make_task(task_service, name="Done")
+    coordinator.assign_user_to_task(active_task.id, user.id)
+    coordinator.assign_user_to_task(done_task.id, user.id)
+    force_status(task_service, done_task.id, "DONE")
+
+    updated_count = coordinator.unassign_user_tasks(user.id)
+
+    assert updated_count == 1
+    done_task_after = task_service.get_task_by_id(done_task.id)
+    assert done_task_after.status == "DONE"
+    assert done_task_after.assignee_user_id == user.id

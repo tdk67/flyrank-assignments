@@ -27,12 +27,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> UserRecor
         telephone=payload.telephone,
     )
     created = service.create_user(dto)
-    return UserRecord(
-        id=created.id,
-        name={"first_name": created.first_name, "last_name": created.last_name},
-        email=created.email,
-        telephone=created.telephone,
-    )
+    return UserRecord.model_validate(created)
 
 
 @router.get(
@@ -54,15 +49,7 @@ def list_users(
         last_name=last_name,
         telephone=telephone,
     )
-    return [
-        UserRecord(
-            id=user.id,
-            name={"first_name": user.first_name, "last_name": user.last_name},
-            email=user.email,
-            telephone=user.telephone,
-        )
-        for user in users
-    ]
+    return [UserRecord.model_validate(user) for user in users]
 
 
 @router.get(
@@ -79,19 +66,14 @@ def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)) -> UserRecord:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"User with id '{user_id}' not found",
         )
-    return UserRecord(
-        id=user.id,
-        name={"first_name": user.first_name, "last_name": user.last_name},
-        email=user.email,
-        telephone=user.telephone,
-    )
+    return UserRecord.model_validate(user)
 
 
-@router.put(
+@router.patch(
     "/user/{user_id}",
     response_model=UserRecord,
     responses={404: {"model": ErrorResponse, "description": "User not found"}},
-    summary="Update a user by id",
+    summary="Partially update a user by id",
 )
 def update_user(user_id: uuid.UUID, payload: UserUpdate, db: Session = Depends(get_db)) -> UserRecord:
     service = get_user_service(db)
@@ -107,12 +89,7 @@ def update_user(user_id: uuid.UUID, payload: UserUpdate, db: Session = Depends(g
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"User with id '{user_id}' not found",
         )
-    return UserRecord(
-        id=user.id,
-        name={"first_name": user.first_name, "last_name": user.last_name},
-        email=user.email,
-        telephone=user.telephone,
-    )
+    return UserRecord.model_validate(user)
 
 
 @router.post(

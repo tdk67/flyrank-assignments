@@ -30,11 +30,6 @@ def test_create_task_defaults_to_planned(service):
     assert task.assignee_user_id is None
 
 
-def test_create_task_rejects_unsupported_status(service):
-    with pytest.raises(ValueError, match="Unsupported status"):
-        service.create_task(TaskCreateDTO(name="T", description=None, status="BOGUS"))
-
-
 def test_update_task_changes_only_provided_fields(service):
     task = make_task(service, description="original")
 
@@ -49,13 +44,50 @@ def test_update_task_missing_returns_none(service):
     assert service.update_task(uuid.uuid4(), TaskUpdateDTO(estimated_duration_days=1)) is None
 
 
-def test_valid_status_transition_sets_timestamp(service):
+def test_status_transition_to_assigned_sets_no_date(service):
     task = make_task(service)
 
     updated = service.change_status(task.id, TaskStatusUpdateDTO(status="ASSIGNED"))
 
     assert updated.status == "ASSIGNED"
-    assert updated.assigned_at is not None
+    assert updated.start_date is None
+    assert updated.end_date is None
+
+
+def test_status_transition_to_started_sets_start_date(service):
+    task = make_task(service)
+    service.change_status(task.id, TaskStatusUpdateDTO(status="ASSIGNED"))
+
+    updated = service.change_status(task.id, TaskStatusUpdateDTO(status="STARTED"))
+
+    assert updated.status == "STARTED"
+    assert updated.start_date is not None
+    assert updated.end_date is None
+
+
+def test_status_transition_to_done_sets_end_date(service):
+    task = make_task(service)
+    service.change_status(task.id, TaskStatusUpdateDTO(status="ASSIGNED"))
+    service.change_status(task.id, TaskStatusUpdateDTO(status="STARTED"))
+
+    updated = service.change_status(task.id, TaskStatusUpdateDTO(status="DONE"))
+
+    assert updated.status == "DONE"
+    assert updated.start_date is not None
+    assert updated.end_date is not None
+
+
+def test_status_transition_retry_after_failed_clears_end_date(service):
+    task = make_task(service)
+    service.change_status(task.id, TaskStatusUpdateDTO(status="ASSIGNED"))
+    service.change_status(task.id, TaskStatusUpdateDTO(status="STARTED"))
+    service.change_status(task.id, TaskStatusUpdateDTO(status="FAILED"))
+
+    updated = service.change_status(task.id, TaskStatusUpdateDTO(status="STARTED"))
+
+    assert updated.status == "STARTED"
+    assert updated.start_date is not None
+    assert updated.end_date is None
 
 
 def test_invalid_status_transition_raises(service):
@@ -85,26 +117,53 @@ def test_assign_task_transitions_to_assigned(service):
 
     assert updated.status == "ASSIGNED"
     assert updated.assignee_user_id == user_id
-    assert updated.assigned_at is not None
 
 
-def test_assign_task_requires_planned_status(service):
+def test_assign_task_rejects_started_status(service):
     task = make_task(service)
     force_status(service, task.id, "STARTED")
 
-    with pytest.raises(ValueError, match="Only a PLANNED task can be assigned"):
+    with pytest.raises(ValueError, match="Only a PLANNED or ASSIGNED task"):
         service.assign_task(task.id, uuid.uuid4())
+
+
+def test_reassign_task_swaps_owner_while_assigned(service):
+    task = make_task(service)
+    first_owner = uuid.uuid4()
+    second_owner = uuid.uuid4()
+    service.assign_task(task.id, first_owner)
+
+    updated = service.assign_task(task.id, second_owner)
+
+    assert updated.status == "ASSIGNED"
+    assert updated.assignee_user_id == second_owner
 
 
 def test_unassign_task_resets_lifecycle_fields(service):
     task = make_task(service)
     service.assign_task(task.id, uuid.uuid4())
+    service.change_status(task.id, TaskStatusUpdateDTO(status="STARTED"))
 
     updated = service.unassign_task(task.id)
 
     assert updated.status == "PLANNED"
     assert updated.assignee_user_id is None
-    assert updated.assigned_at is None
+    assert updated.start_date is None
+    assert updated.end_date is None
+
+
+def test_unassign_done_task_preserves_status_and_end_date(service):
+    task = make_task(service)
+    service.assign_task(task.id, uuid.uuid4())
+    service.change_status(task.id, TaskStatusUpdateDTO(status="STARTED"))
+    service.change_status(task.id, TaskStatusUpdateDTO(status="DONE"))
+
+    updated = service.unassign_task(task.id)
+
+    assert updated.status == "DONE"
+    assert updated.assignee_user_id is None
+    assert updated.start_date is not None
+    assert updated.end_date is not None
 
 
 def test_delete_task_removes_record(service):

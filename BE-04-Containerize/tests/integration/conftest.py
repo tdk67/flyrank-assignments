@@ -46,9 +46,8 @@ def seeded_db(db_session, sample_data) -> dict:
                 description=task["description"],
                 status=task["status"],
                 assignee_user_id=uuid.UUID(task["assignee_user_id"]) if task["assignee_user_id"] else None,
-                assigned_at=_parse_dt(task.get("assigned_at")),
-                started_at=_parse_dt(task.get("started_at")),
-                finished_at=_parse_dt(task.get("finished_at")),
+                start_date=_parse_dt(task.get("start_date")),
+                end_date=_parse_dt(task.get("end_date")),
             )
         )
     db_session.flush()

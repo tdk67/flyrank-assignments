@@ -8,4 +8,6 @@
     <include file="changesets/001_create_users_table.sql" relativeToChangelogFile="true"/>
     <include file="changesets/002_create_tasks_tables.sql" relativeToChangelogFile="true"/>
     <include file="changesets/003_add_task_lifecycle_timestamps.sql" relativeToChangelogFile="true"/>
+    <include file="changesets/004_task_assignee_fk_on_delete_set_null.sql" relativeToChangelogFile="true"/>
+    <include file="changesets/005_drop_task_lifecycle_at_columns.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

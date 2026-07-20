@@ -79,6 +79,7 @@ class TaskCreate(BaseModel):
         description="Task description",
         examples=["Draft the backlog for the next sprint"],
     )
+    estimated_duration_days: Optional[int] = Field(None, description="Estimated duration in days")
 
 
 class TaskUpdate(BaseModel):
@@ -87,8 +88,6 @@ class TaskUpdate(BaseModel):
     name: Optional[str] = Field(None, description="Task name")
     description: Optional[str] = Field(None, description="Task description")
     estimated_duration_days: Optional[int] = Field(None, description="Estimated duration in days")
-    start_date: Optional[datetime] = Field(None, description="Task start timestamp")
-    end_date: Optional[datetime] = Field(None, description="Task end timestamp")
 
 
 class TaskStatusUpdate(BaseModel):
@@ -129,12 +128,12 @@ class TaskRecord(BaseModel):
     description: Optional[str] = Field(None, description="Task description")
     status: str = Field(..., description="Task status")
     estimated_duration_days: Optional[int] = Field(None, description="Estimated duration in days")
-    start_date: Optional[datetime] = Field(None, description="Task start timestamp")
-    end_date: Optional[datetime] = Field(None, description="Task end timestamp")
-    assigned_at: Optional[datetime] = Field(None, description="Timestamp when the task was assigned")
-    started_at: Optional[datetime] = Field(None, description="Timestamp when the task started")
-    finished_at: Optional[datetime] = Field(None, description="Timestamp when the task finished")
-    failed_at: Optional[datetime] = Field(None, description="Timestamp when the task failed")
+    start_date: Optional[datetime] = Field(
+        None, description="Timestamp when the task actually started (set by the STARTED status transition)"
+    )
+    end_date: Optional[datetime] = Field(
+        None, description="Timestamp when the task reached DONE or FAILED (set by that status transition)"
+    )
     assignee_user_id: Optional[uuid.UUID] = Field(None, description="Assigned user id")
 
     model_config = ConfigDict(
@@ -148,10 +147,6 @@ class TaskRecord(BaseModel):
                 "estimated_duration_days": None,
                 "start_date": None,
                 "end_date": None,
-                "assigned_at": None,
-                "started_at": None,
-                "finished_at": None,
-                "failed_at": None,
                 "assignee_user_id": None,
             }
         },
