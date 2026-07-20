@@ -141,7 +141,7 @@ class TaskRecord(BaseModel):
         from_attributes=True,
         json_schema_extra={
             "example": {
-                "id": "e4e5c8a4-2429-4f2c-8752-94c7dd7c6851",
+                "id": "00000000-0000-0000-0000-000000000000",
                 "name": "Prepare sprint backlog",
                 "description": "Draft the backlog for the next sprint",
                 "status": "PLANNED",
