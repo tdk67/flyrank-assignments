@@ -5,9 +5,9 @@ services:
     image: postgres:16-alpine
     container_name: user_service_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: user_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -19,15 +19,19 @@ services:
       retries: 5
 
   db-migrate:
-    image: liquibase/liquibase:latest
+    build:
+      context: .
+      dockerfile: migrate.Dockerfile
     container_name: user_service_migrator
     volumes:
       - ./db:/liquibase/db
     command: >
       --changelog-file=db/changelog/db.changelog-master.xml
-      --url=jdbc:postgresql://db:5432/user_db
-      --username=postgres
-      --password=postgrespassword
+      --url=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      --username=${POSTGRES_USER}
+      --password=${POSTGRES_PASSWORD}
+      --driver=org.postgresql.Driver
+      --classpath=/liquibase/jars/postgresql.jar
       update
     depends_on:
       db:
@@ -39,9 +43,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: user_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
     depends_on:

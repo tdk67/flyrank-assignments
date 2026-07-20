@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
@@ -54,6 +55,107 @@ class UserRecord(BaseModel):
             }
 
         return data
+
+
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Optional[Name] = Field(None, description="User's first and last name")
+    email: Optional[EmailStr] = Field(None, description="Email address (optional)")
+    telephone: Optional[str] = Field(None, description="Telephone number (optional)")
+
+
+class TaskCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(
+        ...,
+        min_length=1,
+        description="Task name",
+        examples=["Prepare sprint backlog"],
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Task description",
+        examples=["Draft the backlog for the next sprint"],
+    )
+
+
+class TaskUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Optional[str] = Field(None, description="Task name")
+    description: Optional[str] = Field(None, description="Task description")
+    estimated_duration_days: Optional[int] = Field(None, description="Estimated duration in days")
+    start_date: Optional[datetime] = Field(None, description="Task start timestamp")
+    end_date: Optional[datetime] = Field(None, description="Task end timestamp")
+
+
+class TaskStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(
+        ...,
+        description="New task status",
+        examples=["STARTED"],
+    )
+
+
+class TaskAssigneeUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assignee_user_id: uuid.UUID = Field(
+        ...,
+        description="Assigned user id",
+        examples=["c3b9a7a9-91c6-43b6-9812-a16fbd4c6a6f"],
+    )
+
+
+class UserTaskUnassignResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    unassigned_count: int = Field(
+        ...,
+        description="Number of assigned tasks reset to PLANNED",
+        examples=[2],
+    )
+
+
+class TaskRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID = Field(..., description="Server-generated unique task id")
+    name: str = Field(..., description="Task name")
+    description: Optional[str] = Field(None, description="Task description")
+    status: str = Field(..., description="Task status")
+    estimated_duration_days: Optional[int] = Field(None, description="Estimated duration in days")
+    start_date: Optional[datetime] = Field(None, description="Task start timestamp")
+    end_date: Optional[datetime] = Field(None, description="Task end timestamp")
+    assigned_at: Optional[datetime] = Field(None, description="Timestamp when the task was assigned")
+    started_at: Optional[datetime] = Field(None, description="Timestamp when the task started")
+    finished_at: Optional[datetime] = Field(None, description="Timestamp when the task finished")
+    failed_at: Optional[datetime] = Field(None, description="Timestamp when the task failed")
+    assignee_user_id: Optional[uuid.UUID] = Field(None, description="Assigned user id")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "e4e5c8a4-2429-4f2c-8752-94c7dd7c6851",
+                "name": "Prepare sprint backlog",
+                "description": "Draft the backlog for the next sprint",
+                "status": "PLANNED",
+                "estimated_duration_days": None,
+                "start_date": None,
+                "end_date": None,
+                "assigned_at": None,
+                "started_at": None,
+                "finished_at": None,
+                "failed_at": None,
+                "assignee_user_id": None,
+            }
+        },
+    )
 
 
 class ErrorResponse(BaseModel):
