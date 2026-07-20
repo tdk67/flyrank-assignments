@@ -104,6 +104,10 @@ def get_task(task_id: uuid.UUID, db: Session = Depends(get_db)) -> TaskRecord:
         estimated_duration_days=task.estimated_duration_days,
         start_date=task.start_date,
         end_date=task.end_date,
+        assigned_at=task.assigned_at,
+        started_at=task.started_at,
+        finished_at=task.finished_at,
+        failed_at=task.failed_at,
         assignee_user_id=task.assignee_user_id,
     )
 

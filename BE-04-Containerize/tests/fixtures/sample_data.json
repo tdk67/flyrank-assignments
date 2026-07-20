@@ -1,0 +1,67 @@
+{
+  "users": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "first_name": "Ada",
+      "last_name": "Lovelace",
+      "email": "ada@example.com",
+      "telephone": "+1-555-0100"
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "first_name": "Alan",
+      "last_name": "Turing",
+      "email": "alan@example.com",
+      "telephone": null
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "first_name": "Grace",
+      "last_name": "Hopper",
+      "email": "grace@example.com",
+      "telephone": "+1-555-0102"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "name": "Design API",
+      "description": "Draft the endpoint contracts",
+      "status": "PLANNED",
+      "assignee_user_id": null,
+      "assigned_at": null,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "name": "Implement service layer",
+      "description": "Write the business rules",
+      "status": "ASSIGNED",
+      "assignee_user_id": "11111111-1111-1111-1111-111111111111",
+      "assigned_at": "2026-01-05T09:00:00+00:00",
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "name": "Write tests",
+      "description": "Add the pytest suite",
+      "status": "STARTED",
+      "assignee_user_id": "22222222-2222-2222-2222-222222222222",
+      "assigned_at": "2026-01-06T09:00:00+00:00",
+      "started_at": "2026-01-07T09:00:00+00:00",
+      "finished_at": null
+    },
+    {
+      "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "name": "Ship release",
+      "description": "Deploy to production",
+      "status": "DONE",
+      "assignee_user_id": "33333333-3333-3333-3333-333333333333",
+      "assigned_at": "2026-01-02T09:00:00+00:00",
+      "started_at": "2026-01-03T09:00:00+00:00",
+      "finished_at": "2026-01-10T12:00:00+00:00"
+    }
+  ]
+}

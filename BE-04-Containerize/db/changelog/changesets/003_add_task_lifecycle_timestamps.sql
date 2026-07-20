@@ -1,0 +1,7 @@
+-- liquibase formatted sql
+
+-- changeset developer:3
+ALTER TABLE tasks ADD COLUMN assigned_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE tasks ADD COLUMN started_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE tasks ADD COLUMN finished_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE tasks ADD COLUMN failed_at TIMESTAMP WITH TIME ZONE;

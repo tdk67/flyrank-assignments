@@ -268,7 +268,68 @@ This is an important real-world lesson: credentials are often user-supplied data
 
 ---
 
-## 6. Troubleshooting
+## 6. Testing
+
+The test suite lives under `tests/` and is split into two layers that trade off speed against fidelity to production.
+
+### 6.1 Test layout
+
+```text
+tests/
+├── conftest.py                    # test-DB creation, migration replay, transactional session, TestClient override
+├── unit/
+│   ├── fakes.py                   # in-memory fakes of UserRepositoryPort / TaskRepositoryPort
+│   ├── test_user_service.py
+│   ├── test_task_service.py
+│   └── test_user_task_service.py
+├── integration/
+│   ├── conftest.py                # sample-data loading fixture
+│   ├── sample_data.py             # named UUID constants for the fixture data
+│   ├── test_health_api.py
+│   ├── test_user_api.py
+│   └── test_task_api.py
+└── fixtures/
+    └── sample_data.json           # the sample dataset: 3 users, 4 tasks across the status lifecycle
+```
+
+### 6.2 Unit tests
+
+`tests/unit/` tests `UserService`, `TaskService`, and `UserTaskService` in isolation, against hand-written in-memory fakes of the repository ports (`tests/unit/fakes.py`) rather than a real database. No network, no Docker, no migrations — these run in well under a second and are the fast feedback loop for changes to business rules (the status state machine, assignment/unassignment, delete-safety).
+
+### 6.3 Integration tests
+
+`tests/integration/` exercises the real HTTP surface end-to-end:
+
+1. **Schema**: a session-scoped fixture drops and recreates a dedicated `user_db_test` database on the same Postgres container the dev stack already runs, then replays the actual Liquibase changeset files from `db/changelog/changesets/` in order — not `Base.metadata.create_all()` from `models.py`. This is deliberate: replaying the real migration files is what would have caught (and still guards against) drift between `models.py` and the changesets, such as the missing `assigned_at` / `started_at` / `finished_at` / `failed_at` columns that changeset `002_create_tasks_tables.sql` originally omitted.
+2. **Sample dataset**: `tests/fixtures/sample_data.json` defines a fixed dataset — Ada, Alan, and Grace as users, and four tasks spanning the full status lifecycle (`PLANNED`, `ASSIGNED`, `STARTED`, `DONE`). The `seeded_db` fixture (`tests/integration/conftest.py`) inserts this dataset directly via the SQLAlchemy session before each test that requests it; `tests/integration/sample_data.py` exposes the same IDs as named constants (`ADA_ID`, `TASK_SHIP_RELEASE_ID`, …) so tests read like prose instead of scattering raw UUID strings.
+3. **Isolation**: each test runs inside its own database transaction, opened before the test and rolled back after (see the `db_session` fixture in `tests/conftest.py`). Repositories call `session.commit()` during normal request handling; an `after_transaction_end` listener restarts a SAVEPOINT whenever that happens, so those commits only release the savepoint — nothing survives past the test.
+4. **Driving the API**: the `client` fixture overrides the `get_db` FastAPI dependency to yield that same per-test session, then wraps the app in `TestClient`, so requests exercise the real routes, services, and repositories — the only thing swapped out is which database transaction they talk to.
+
+### 6.4 Running the tests
+
+```bash
+docker compose up -d db              # only the db container needs to be running
+pip install -r requirements-dev.txt  # adds pytest and httpx on top of requirements.txt
+pytest
+```
+
+Expected output:
+```text
+49 passed in ~1s
+```
+
+Run just one layer, one file, or one test:
+```bash
+pytest tests/unit                                            # fast, no DB
+pytest tests/integration/test_task_api.py -v
+pytest tests/integration/test_task_api.py::test_invalid_status_transition_rejected
+```
+
+`pytest.ini` sets `pythonpath = .`, so tests can import app modules directly (`from services.user_service import UserService`, `from database import get_db`, etc.) regardless of the shell's working directory when `pytest` is invoked.
+
+---
+
+## 7. Troubleshooting
 
 ### 1. `Cannot find database driver: org.postgresql.Driver`
 
@@ -357,7 +418,7 @@ After that, rerun the migration and restart the API.
 
 ---
 
-## 7. API Usage Guide
+## 8. API Usage Guide
 
 Once the server is running, the Swagger interactive documentation is accessible at:
 - **Swagger UI**: http://localhost:8000/docs
