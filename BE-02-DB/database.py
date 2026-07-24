@@ -86,3 +86,15 @@ class TaskRepository:
             return None
 
         return TaskDTO(id=row["id"], title=row["title"], done=bool(row["done"]))
+
+    def create(self, title: str) -> TaskDTO:
+        """Insert a new task into the database with done=0 and return the created TaskDTO."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO tasks (title, done) VALUES (?, 0)", (title,))
+        conn.commit()
+        new_id = cursor.lastrowid
+        conn.close()
+
+        return TaskDTO(id=new_id, title=title, done=False)
+

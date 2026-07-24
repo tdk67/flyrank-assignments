@@ -1,13 +1,10 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI
 
 from database import TaskRepository
-from schemas import TaskResponse
-from service import TaskNotFoundError, TaskService
+from task_routes import router as task_router
 
-# Initialize global repository and service instances
 repository = TaskRepository()
-service = TaskService(repository=repository)
 
 
 @asynccontextmanager
@@ -19,14 +16,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Task API with SQLite (BE-02)",
-    description="A layered FastAPI task service backed by a SQLite database.",
+    description="A modular FastAPI task service backed by a SQLite database.",
     version="1.0.0",
     lifespan=lifespan,
 )
 
+# Register domain router
+app.include_router(task_router)
+
 
 # ---------------------------------------------------------------------------
-# Routes
+# Core / Health Routes
 # ---------------------------------------------------------------------------
 
 
@@ -42,26 +42,3 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok", "database": "tasks.db"}
-
-
-@app.get("/tasks", response_model=list[TaskResponse], tags=["tasks"])
-def get_tasks():
-    """Fetch all tasks via the Service layer."""
-    tasks = service.get_all_tasks()
-    return [
-        TaskResponse(id=t.id, title=t.title, done=t.done)
-        for t in tasks
-    ]
-
-
-@app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])
-def get_task(task_id: int):
-    """Fetch a single task by ID via the Service layer."""
-    try:
-        t = service.get_task_by_id(task_id)
-        return TaskResponse(id=t.id, title=t.title, done=t.done)
-    except TaskNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        )

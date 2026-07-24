@@ -22,22 +22,27 @@ The project strictly decouples HTTP/API concerns from business logic and databas
 [ HTTP Request ]
        │
        ▼
-┌──────────────────┐
-│   main.py (API)  │  ◄── Uses schemas.py (TaskResponse)
-└────────┬─────────┘      Has ZERO knowledge of SQL or sqlite3
-         │
-         ▼
-┌──────────────────┐
-│ service.py (Svc) │  ◄── Contains business logic & TaskNotFoundError
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ database.py (DB) │  ◄── Uses TaskDTO & raw SQL queries
-└────────┬─────────┘      Seeds from sample_data.json if DB is empty
-         │
-         ▼
-[    tasks.db    ]
+┌──────────────────────┐
+│     main.py          │  ◄── Composition Root & Lifespan
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  task_routes.py      │  ◄── Uses schemas.py (TaskResponse, TaskCreate)
+└──────────┬───────────┘      FastAPI APIRouter for /tasks endpoints
+           │
+           ▼
+┌──────────────────────┐
+│   service.py (Svc)   │  ◄── Business logic & TaskNotFoundError / InvalidTaskError
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│   database.py (DB)   │  ◄── Uses TaskDTO & raw SQL queries
+└──────────┬───────────┘      Seeds from sample_data.json if DB is empty
+           │
+           ▼
+[      tasks.db      ]
 ```
 
 ### Module Responsibilities:
@@ -46,9 +51,10 @@ The project strictly decouples HTTP/API concerns from business logic and databas
 |---|---|---|
 | `sample_data.json` | Seed Data | External JSON file pre-defining default tasks (`title`, `done`). |
 | `database.py` | DB / Persistence | Defines `TaskDTO` and `TaskRepository`. Manages SQLite connections, table creation, JSON seeding, and raw SQL queries (`SELECT`, `INSERT`, etc.). |
-| `service.py` | Business / Service | Defines `TaskService` and domain exceptions (`TaskNotFoundError`). Handles domain logic and coordinates with `TaskRepository`. |
+| `service.py` | Business / Service | Defines `TaskService` and domain exceptions (`TaskNotFoundError`, `InvalidTaskError`). Handles domain logic and coordinates with `TaskRepository`. |
 | `schemas.py` | API Models | Pydantic models (`TaskResponse`, `TaskCreate`, `TaskUpdate`) used for API request parsing and response formatting. |
-| `main.py` | API / Router | FastAPI application routes (`GET /tasks`, `GET /tasks/{id}`). Calls `TaskService` and converts domain errors to HTTP status codes (`404`). |
+| `task_routes.py` | API Router | Dedicated FastAPI `APIRouter` for `/tasks` endpoints. Converts service domain errors to HTTP status codes (`400`, `404`). |
+| `main.py` | Application Entry | Composition root. Configures FastAPI app, mounts `task_router`, handles database lifespan startup, and defines root/health endpoints. |
 
 ---
 
@@ -115,7 +121,7 @@ You can view, edit, and query the SQLite database using **DBeaver**:
 
 - [x] **Stage 0: Create SQLite database** – Auto-create `tasks.db`, define `tasks` table (`id`, `title`, `done`), and seed 3 default tasks if empty.
 - [x] **Stage 1: Read endpoints** – Implement `GET /tasks` and `GET /tasks/{id}` using SQL queries and parameterized placeholders.
-- [ ] **Stage 2: Create endpoint** – Implement `POST /tasks` with validation (non-empty title) and SQL `INSERT`.
+- [x] **Stage 2: Create endpoint** – Implement `POST /tasks` with validation (non-empty title) and SQL `INSERT`.
 - [ ] **Stage 3: Update & Delete endpoints** – Implement `PUT /tasks/{id}` and `DELETE /tasks/{id}` with correct status codes.
 - [ ] **Stage 4: Explore SQLite by hand** – Connect via DB Browser for SQLite or DBeaver and execute raw SQL queries.
 - [ ] **Stage 5: Documentation & Publishing** – Complete README, document example queries, and finalize repo setup.

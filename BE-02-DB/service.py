@@ -9,6 +9,11 @@ class TaskNotFoundError(Exception):
         super().__init__(f"Task with id {task_id} not found")
 
 
+class InvalidTaskError(Exception):
+    """Domain exception raised when task creation or validation fails."""
+    pass
+
+
 class TaskService:
     """Service layer containing business logic and coordinating with the repository."""
 
@@ -25,3 +30,10 @@ class TaskService:
         if task is None:
             raise TaskNotFoundError(task_id)
         return task
+
+    def create_task(self, title: str) -> TaskDTO:
+        """Validate input title and create a new task."""
+        if not title or not title.strip():
+            raise InvalidTaskError("Title is required and cannot be empty")
+        return self.repository.create(title.strip())
+
