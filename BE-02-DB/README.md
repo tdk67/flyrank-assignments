@@ -14,6 +14,44 @@ This project transitions an in-memory CRUD API into a disk-persisted database se
 
 ---
 
+## 🏗️ Layered Architecture & Separation of Concerns
+
+The project strictly decouples HTTP/API concerns from business logic and database access using a 3-tier architecture:
+
+```
+[ HTTP Request ]
+       │
+       ▼
+┌──────────────────┐
+│   main.py (API)  │  ◄── Uses schemas.py (TaskResponse)
+└────────┬─────────┘      Has ZERO knowledge of SQL or sqlite3
+         │
+         ▼
+┌──────────────────┐
+│ service.py (Svc) │  ◄── Contains business logic & TaskNotFoundError
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ database.py (DB) │  ◄── Uses TaskDTO & raw SQL queries
+└────────┬─────────┘      Seeds from sample_data.json if DB is empty
+         │
+         ▼
+[    tasks.db    ]
+```
+
+### Module Responsibilities:
+
+| File | Layer | Description |
+|---|---|---|
+| `sample_data.json` | Seed Data | External JSON file pre-defining default tasks (`title`, `done`). |
+| `database.py` | DB / Persistence | Defines `TaskDTO` and `TaskRepository`. Manages SQLite connections, table creation, JSON seeding, and raw SQL queries (`SELECT`, `INSERT`, etc.). |
+| `service.py` | Business / Service | Defines `TaskService` and domain exceptions (`TaskNotFoundError`). Handles domain logic and coordinates with `TaskRepository`. |
+| `schemas.py` | API Models | Pydantic models (`TaskResponse`, `TaskCreate`, `TaskUpdate`) used for API request parsing and response formatting. |
+| `main.py` | API / Router | FastAPI application routes (`GET /tasks`, `GET /tasks/{id}`). Calls `TaskService` and converts domain errors to HTTP status codes (`404`). |
+
+---
+
 ## 🚀 How to Install & Run
 
 ### 1. Prerequisites

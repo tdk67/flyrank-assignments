@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Buy milk",
+    "done": false
+  },
+  {
+    "title": "Clean apartment",
+    "done": false
+  },
+  {
+    "title": "Learn SQLite",
+    "done": true
+  }
+]
