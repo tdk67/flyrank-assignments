@@ -112,8 +112,11 @@ You can view, edit, and query the SQLite database using **DBeaver**:
 | `GET` | `/tasks` | List all tasks | `200 OK` | - |
 | `GET` | `/tasks/{id}` | Get single task by ID | `200 OK` | `404 Not Found` |
 | `POST` | `/tasks` | Create a new task (`title` required) | `201 Created` | `400 Bad Request` |
-| `PUT` | `/tasks/{id}` | Update task `title` and/or `done` status | `200 OK` | `400 Bad Request` / `404 Not Found` |
+| `PUT` | `/tasks/{id}` | Full/Partial update task `title` and/or `done` | `200 OK` | `400 Bad Request` / `404 Not Found` |
+| `PATCH` | `/tasks/{id}` | Partial update task `title` and/or `done` status | `200 OK` | `400 Bad Request` / `404 Not Found` |
 | `DELETE` | `/tasks/{id}` | Delete task by ID | `204 No Content` | `404 Not Found` |
+
+> 💡 **Note on REST Semantics (`PUT` vs `PATCH`)**: Standard HTTP REST conventions distinguish full resource replacement (`PUT`) from partial field updates (`PATCH`). While the assignment specification requires `PUT /tasks/{id}`, we also expose `PATCH /tasks/{id}` to allow clients to cleanly perform partial updates (such as updating only `done=true` or changing the `title`) without sending the entire task object.
 
 ---
 
@@ -122,7 +125,7 @@ You can view, edit, and query the SQLite database using **DBeaver**:
 - [x] **Stage 0: Create SQLite database** – Auto-create `tasks.db`, define `tasks` table (`id`, `title`, `done`), and seed 3 default tasks if empty.
 - [x] **Stage 1: Read endpoints** – Implement `GET /tasks` and `GET /tasks/{id}` using SQL queries and parameterized placeholders.
 - [x] **Stage 2: Create endpoint** – Implement `POST /tasks` with validation (non-empty title) and SQL `INSERT`.
-- [ ] **Stage 3: Update & Delete endpoints** – Implement `PUT /tasks/{id}` and `DELETE /tasks/{id}` with correct status codes.
+- [x] **Stage 3: Update & Delete endpoints** – Implement `PUT /tasks/{id}` and `DELETE /tasks/{id}` with correct status codes.
 - [ ] **Stage 4: Explore SQLite by hand** – Connect via DB Browser for SQLite or DBeaver and execute raw SQL queries.
 - [ ] **Stage 5: Documentation & Publishing** – Complete README, document example queries, and finalize repo setup.
 

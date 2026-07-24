@@ -98,3 +98,32 @@ class TaskRepository:
 
         return TaskDTO(id=new_id, title=title, done=False)
 
+    def update(self, task_id: int, title: str, done: bool) -> Optional[TaskDTO]:
+        """Update title and done status of a task record by ID."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+            (title, 1 if done else 0, task_id)
+        )
+        conn.commit()
+        rows_affected = cursor.rowcount
+        conn.close()
+
+        if rows_affected == 0:
+            return None
+
+        return TaskDTO(id=task_id, title=title, done=done)
+
+    def delete(self, task_id: int) -> bool:
+        """Delete a task record by ID. Returns True if deleted, False if not found."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        conn.commit()
+        rows_affected = cursor.rowcount
+        conn.close()
+
+        return rows_affected > 0
+
+

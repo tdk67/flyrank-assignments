@@ -37,3 +37,34 @@ class TaskService:
             raise InvalidTaskError("Title is required and cannot be empty")
         return self.repository.create(title.strip())
 
+    def update_task(
+        self,
+        task_id: int,
+        title: Optional[str] = None,
+        done: Optional[bool] = None,
+    ) -> TaskDTO:
+        """Update an existing task's title and/or done status."""
+        existing = self.get_task_by_id(task_id)  # Raises TaskNotFoundError if missing
+
+        # If title is explicitly provided, validate it
+        new_title = existing.title
+        if title is not None:
+            if not title.strip():
+                raise InvalidTaskError("Title cannot be empty")
+            new_title = title.strip()
+
+        new_done = existing.done if done is None else done
+
+        updated = self.repository.update(task_id, new_title, new_done)
+        if updated is None:
+            raise TaskNotFoundError(task_id)
+
+        return updated
+
+    def delete_task(self, task_id: int) -> None:
+        """Delete a task by ID or raise TaskNotFoundError."""
+        deleted = self.repository.delete(task_id)
+        if not deleted:
+            raise TaskNotFoundError(task_id)
+
+
