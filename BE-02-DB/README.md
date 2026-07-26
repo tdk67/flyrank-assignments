@@ -45,16 +45,71 @@ The project strictly decouples HTTP/API concerns from business logic and databas
 [      tasks.db      ]
 ```
 
-### Module Responsibilities:
+### 📁 Project Directory Structure
 
-| File | Layer | Description |
+```
+BE-02-DB/
+├── migrations/                                # Versioned SQL database migration scripts
+│   ├── 001_create_tasks_table.sql            # Migration 001: Initial tasks table schema
+│   └── 002_add_timestamps.sql                # Migration 002: Add created_at and updated_at columns
+├── .gitignore                                 # Git ignore rules (excludes tasks.db, .venv/, __pycache__/)
+├── requirements.txt                           # Python project dependencies (fastapi, uvicorn, pydantic)
+├── sample_data.json                           # Initial JSON seed data for auto-populating tasks.db
+├── database.py                                # DB Layer: TaskDTO, TaskRepository, migration runner, SQLite queries
+├── service.py                                 # Service Layer: TaskService, TaskNotFoundError, InvalidTaskError
+├── schemas.py                                 # API Layer: Pydantic schemas (TaskResponse, TaskCreate, TaskReplace, TaskUpdate, StatsResponse)
+├── task_routes.py                             # API Layer Router: APIRouter handling /tasks endpoints
+├── main.py                                    # Application Entry: Composition root, lifespan, / /health /stats routes
+├── README.md                                  # Project documentation and architectural guide
+├── W2 - Build your first CRUD API.pdf         # Assignment A1 specification PDF
+└── W3 - Connecting your CRUD to the database.pdf # Assignment A2 specification PDF
+```
+
+### 📄 Detailed File Inventory & Responsibilities
+
+| File / Directory | Layer / Purpose | Detailed Responsibilities |
 |---|---|---|
-| `sample_data.json` | Seed Data | External JSON file pre-defining default tasks (`title`, `done`). |
-| `database.py` | DB / Persistence | Defines `TaskDTO` and `TaskRepository`. Manages SQLite connections, table creation, JSON seeding, and raw SQL queries (`SELECT`, `INSERT`, etc.). |
-| `service.py` | Business / Service | Defines `TaskService` and domain exceptions (`TaskNotFoundError`, `InvalidTaskError`). Handles domain logic and coordinates with `TaskRepository`. |
-| `schemas.py` | API Models | Pydantic models (`TaskResponse`, `TaskCreate`, `TaskUpdate`) used for API request parsing and response formatting. |
-| `task_routes.py` | API Router | Dedicated FastAPI `APIRouter` for `/tasks` endpoints. Converts service domain errors to HTTP status codes (`400`, `404`). |
-| `main.py` | Application Entry | Composition root. Configures FastAPI app, mounts `task_router`, handles database lifespan startup, and defines root/health endpoints. |
+| **`migrations/`** | Schema Migrations | Contains version-prefixed SQL migration files (`001_...sql`, `002_...sql`). |
+| **`.gitignore`** | Version Control | Prevents generated files (`tasks.db`), virtual environment (`.venv/`), and compiled bytecode (`__pycache__/`) from being committed to Git. |
+| **`requirements.txt`** | Dependencies | Specifies exact Python packages required (`fastapi`, `uvicorn[standard]`, `pydantic`). |
+| **`sample_data.json`** | Seed Data | External JSON file pre-defining default task records (`title`, `done`). Loaded on first startup if `tasks.db` is empty. |
+| **`database.py`** | Database / Persistence | Defines **`TaskDTO`** (`dataclass` with `created_at` & `updated_at`). **`TaskRepository`** includes `run_migrations()` to scan and execute pending `.sql` files, tracks versions in `schema_migrations`, manages raw SQL queries, and populates `GET /stats`. |
+| **`service.py`** | Business / Service | Defines **`TaskService`** and domain exceptions (**`TaskNotFoundError`**, **`InvalidTaskError`**). Enforces business validation rules and separates **`replace_task`** (`PUT`) from **`patch_task`** (`PATCH`). |
+| **`schemas.py`** | API Schemas | Defines Pydantic request/response models: **`TaskResponse`** (includes `created_at` & `updated_at`), **`TaskCreate`**, **`TaskReplace`**, **`TaskUpdate`**, and **`StatsResponse`**. |
+| **`task_routes.py`** | API Router | Dedicated FastAPI `APIRouter(prefix="/tasks")`. Implements HTTP handlers for `GET /tasks` (with `?search` and `?done` filters), `GET /tasks/{id}`, `POST /tasks`, `PUT /tasks/{id}`, `PATCH /tasks/{id}`, and `DELETE /tasks/{id}`. |
+| **`main.py`** | Application Entrypoint | Composition root. Configures FastAPI instance, mounts `task_router`, runs database lifespan migration runner & seeding (`init_db()`), and defines system endpoints (`GET /`, `GET /health`, `GET /stats`). |
+| **`README.md`** | Documentation | Comprehensive developer documentation, setup instructions, architecture breakdown, DBeaver connection guide, migration guide, and progress checklist. |
+
+---
+
+## 🔄 Versioned Database Migrations System & Fresh DB Setup
+
+Instead of destroying or manually editing the database when the schema changes, the project uses an automated, version-based SQL migration runner built into `database.py`:
+
+### How Migrations Work:
+1. **Tracking Table (`schema_migrations`)**:
+   On application startup, SQLite creates a tracking table:
+   ```sql
+   CREATE TABLE IF NOT EXISTS schema_migrations (
+       version INTEGER PRIMARY KEY,
+       filename TEXT NOT NULL,
+       applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+   );
+   ```
+2. **Sequential File Execution**:
+   The runner scans `migrations/*.sql` sorted by filename (`001`, `002`, ...). Any migration version not present in `schema_migrations` is executed inside a SQL transaction and recorded.
+
+3. **Fresh Database Replay & Seeding**:
+   If `tasks.db` is deleted or created on a clean machine:
+   - `run_migrations()` automatically executes `001_create_tasks_table.sql` and `002_add_timestamps.sql` in order.
+   - `init_db()` detects `COUNT(*) == 0` and populates `sample_data.json` with initial timestamps.
+
+### Applied Changesets & Timestamps:
+- **`001_create_tasks_table.sql`**: Creates initial `tasks` table (`id`, `title`, `done`).
+- **`002_add_timestamps.sql`**: Adds `created_at` and `updated_at` columns (`TIMESTAMP`).
+- **Explicit Timestamp Handling**: To support SQLite `ALTER TABLE` rules cleanly across existing and new rows:
+  - New insertions (`POST /tasks` & `sample_data.json` seeding) explicitly pass `created_at` and `updated_at` as `CURRENT_TIMESTAMP`.
+  - Task updates (`PUT` & `PATCH`) automatically refresh `updated_at = CURRENT_TIMESTAMP`.
 
 ---
 
@@ -109,14 +164,22 @@ You can view, edit, and query the SQLite database using **DBeaver**:
 |---|---|---|---|---|
 | `GET` | `/` | API Root / Info | `200 OK` | - |
 | `GET` | `/health` | Server Health & DB status check | `200 OK` | - |
-| `GET` | `/tasks` | List all tasks | `200 OK` | - |
+| `GET` | `/stats` | Database Statistics (tables & row counts) | `200 OK` | - |
+| `GET` | `/tasks` | List all tasks (Supports `?search=term` and `?done=true/false`) | `200 OK` | - |
 | `GET` | `/tasks/{id}` | Get single task by ID | `200 OK` | `404 Not Found` |
 | `POST` | `/tasks` | Create a new task (`title` required) | `201 Created` | `400 Bad Request` |
-| `PUT` | `/tasks/{id}` | Full/Partial update task `title` and/or `done` | `200 OK` | `400 Bad Request` / `404 Not Found` |
-| `PATCH` | `/tasks/{id}` | Partial update task `title` and/or `done` status | `200 OK` | `400 Bad Request` / `404 Not Found` |
+| `PUT` | `/tasks/{id}` | Full resource replacement (requires both `title` and `done`) | `200 OK` | `400 Bad Request` / `404` / `422` |
+| `PATCH` | `/tasks/{id}` | Partial field update (`title` and/or `done` optional) | `200 OK` | `400 Bad Request` / `404 Not Found` |
 | `DELETE` | `/tasks/{id}` | Delete task by ID | `204 No Content` | `404 Not Found` |
 
-> 💡 **Note on REST Semantics (`PUT` vs `PATCH`)**: Standard HTTP REST conventions distinguish full resource replacement (`PUT`) from partial field updates (`PATCH`). While the assignment specification requires `PUT /tasks/{id}`, we also expose `PATCH /tasks/{id}` to allow clients to cleanly perform partial updates (such as updating only `done=true` or changing the `title`) without sending the entire task object.
+> 💡 **Strict REST Semantics (`PUT` vs `PATCH`)**:
+> - **`PUT /tasks/{id}` (Full Replacement - RFC 9110)**: Uses the `TaskReplace` Pydantic model where **both `title` AND `done` are mandatory**. Omitting either field results in a `422 Unprocessable Entity` validation error.
+> - **`PATCH /tasks/{id}` (Partial Update - RFC 5789)**: Uses the `TaskUpdate` Pydantic model where **all fields are optional (`title: Optional[str]`, `done: Optional[bool]`)**. Only fields explicitly sent by the client are modified in the database.
+>
+> | Endpoint | Schema Model | `{"title": "X", "done": true}` | `{"done": true}` (omitting title) |
+> |---|---|---|---|
+> | `PUT /tasks/{id}` | `TaskReplace` (Strict) | ✅ `200 OK` (Replaces resource) | ❌ `422 Unprocessable Entity` |
+> | `PATCH /tasks/{id}` | `TaskUpdate` (Delta) | ✅ `200 OK` (Updates both) | ✅ `200 OK` (Updates `done` only) |
 
 ---
 
@@ -126,8 +189,8 @@ You can view, edit, and query the SQLite database using **DBeaver**:
 - [x] **Stage 1: Read endpoints** – Implement `GET /tasks` and `GET /tasks/{id}` using SQL queries and parameterized placeholders.
 - [x] **Stage 2: Create endpoint** – Implement `POST /tasks` with validation (non-empty title) and SQL `INSERT`.
 - [x] **Stage 3: Update & Delete endpoints** – Implement `PUT /tasks/{id}` and `DELETE /tasks/{id}` with correct status codes.
-- [ ] **Stage 4: Explore SQLite by hand** – Connect via DB Browser for SQLite or DBeaver and execute raw SQL queries.
-- [ ] **Stage 5: Documentation & Publishing** – Complete README, document example queries, and finalize repo setup.
+- [x] **Stage 4: Explore SQLite by hand** – Connect via DB Browser for SQLite or DBeaver and execute raw SQL queries.
+- [x] **Stage 5: Documentation & Publishing** – Complete README, document example queries, and finalize repo setup.
 
 ---
 
@@ -151,3 +214,7 @@ UPDATE tasks SET done = 1 WHERE id = 1;
 -- Delete completed tasks
 DELETE FROM tasks WHERE done = 1;
 ```
+
+### 📝 Stage 4 Direct DB Exploration Observation
+> **Exploration Query**: `UPDATE tasks SET done = 1 WHERE id = 2;`
+> **Result & Observation**: Executing this update directly inside DBeaver instantly modified the underlying `tasks.db` file. Calling `GET /tasks/2` via the FastAPI backend immediately returned `"done": true` without requiring an API server restart—confirming that the SQLite database file serves as the single source of truth for both DBeaver and the API.

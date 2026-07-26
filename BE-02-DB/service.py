@@ -20,9 +20,18 @@ class TaskService:
     def __init__(self, repository: Optional[TaskRepository] = None):
         self.repository = repository or TaskRepository()
 
-    def get_all_tasks(self) -> list[TaskDTO]:
-        """Retrieve all tasks."""
-        return self.repository.get_all()
+    def get_all_tasks(
+        self,
+        search: Optional[str] = None,
+        done: Optional[bool] = None,
+    ) -> list[TaskDTO]:
+        """Retrieve all tasks with optional search (LIKE) and completion status filters."""
+        return self.repository.get_all(search=search, done=done)
+
+    def get_stats(self) -> dict:
+        """Retrieve database statistics (tables and row count breakdown)."""
+        return self.repository.get_stats()
+
 
     def get_task_by_id(self, task_id: int) -> TaskDTO:
         """Retrieve a task by ID or raise TaskNotFoundError."""
@@ -37,16 +46,28 @@ class TaskService:
             raise InvalidTaskError("Title is required and cannot be empty")
         return self.repository.create(title.strip())
 
-    def update_task(
+    def replace_task(self, task_id: int, title: str, done: bool) -> TaskDTO:
+        """Full replacement (PUT): Replaces the entire task state with the new title and done status."""
+        self.get_task_by_id(task_id)  # Raises TaskNotFoundError if missing
+
+        if not title or not title.strip():
+            raise InvalidTaskError("Title is required and cannot be empty")
+
+        updated = self.repository.update(task_id, title.strip(), done)
+        if updated is None:
+            raise TaskNotFoundError(task_id)
+
+        return updated
+
+    def patch_task(
         self,
         task_id: int,
         title: Optional[str] = None,
         done: Optional[bool] = None,
     ) -> TaskDTO:
-        """Update an existing task's title and/or done status."""
+        """Partial update (PATCH): Updates only the fields provided, leaving unsupplied fields unchanged."""
         existing = self.get_task_by_id(task_id)  # Raises TaskNotFoundError if missing
 
-        # If title is explicitly provided, validate it
         new_title = existing.title
         if title is not None:
             if not title.strip():
@@ -60,6 +81,7 @@ class TaskService:
             raise TaskNotFoundError(task_id)
 
         return updated
+
 
     def delete_task(self, task_id: int) -> None:
         """Delete a task by ID or raise TaskNotFoundError."""
