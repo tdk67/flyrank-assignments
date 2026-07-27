@@ -1,6 +1,6 @@
 import re
 from fastapi import APIRouter, Depends, HTTPException
-from schemas import AuthCredentials
+from schemas import AuthCredentials, RefreshTokenRequest
 from security import UserProfile, get_current_user
 from supabase_client import supabase
 
@@ -104,6 +104,34 @@ def login(credentials: AuthCredentials):
     return {
         "message": "Login successful",
         "access_token": response.session.access_token,   # <-- this is the JWT
+        "refresh_token": response.session.refresh_token,
+        "token_type": "bearer",
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/refresh (Stretch Goal)
+# What happens:
+#   1. Client sends their refresh_token
+#   2. Calls Supabase refresh_session(refresh_token)
+#   3. Returns new access_token and refresh_token
+# ---------------------------------------------------------------------------
+@router.post("/refresh", status_code=200)
+def refresh(body: RefreshTokenRequest):
+    if not body.refresh_token.strip():
+        raise HTTPException(status_code=400, detail="Refresh token is required")
+
+    try:
+        response = supabase.auth.refresh_session(body.refresh_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    if response.session is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    return {
+        "message": "Token refreshed successfully",
+        "access_token": response.session.access_token,
         "refresh_token": response.session.refresh_token,
         "token_type": "bearer",
     }

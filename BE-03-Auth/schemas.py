@@ -19,3 +19,10 @@ class UserProfile(BaseModel):
     email: str
     created_at: str
     token: str
+
+
+# ---------------------------------------------------------------------------
+# Token Refresh Request Schema
+# ---------------------------------------------------------------------------
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

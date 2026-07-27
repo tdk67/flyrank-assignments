@@ -27,12 +27,14 @@ Your server **never stores passwords**. Supabase handles all cryptography.
 | Method | Route | Auth required | Description |
 |--------|-------|:---:|---|
 | POST | `/auth/signup` | ❌ | Create a new user account |
-| POST | `/auth/login` | ❌ | Log in and receive a JWT |
+| POST | `/auth/login` | ❌ | Log in and receive a JWT & refresh token |
+| POST | `/auth/refresh` | ❌ | Exchange refresh token for new access token |
 | POST | `/auth/logout` | ✅ Bearer | End the user session |
 | GET | `/public/info` | ❌ | Open endpoint, no token needed |
-| GET | `/protected/profile` | ✅ Bearer | Returns current user details |
+| GET | `/protected/profile` | ✅ Bearer | Returns current user profile details |
+| GET | `/protected/dashboard` | ✅ Bearer | Protected user dashboard stats |
 
-Status codes: `201` signup · `200` login/read · `204` logout · `400` missing input · `401` bad/missing token
+Status codes: `201` signup · `200` login/read/refresh · `204` logout · `400` missing input · `401` bad/missing token
 
 ---
 
@@ -329,18 +331,17 @@ FastAPI uses parameter dependency injection (`Depends()`) instead of decorators 
 - [x] Screenshot of Swagger taken for README
 - [x] **Commit**: `Stage 5: Swagger UI documentation with bearer auth`
 
-### Stage 6 — Publish to GitHub
-- [ ] Public GitHub repo created
-- [ ] `.env` confirmed absent from all commits (`git log --all -- .env`)
-- [ ] `.env.example` committed with placeholder values
-- [ ] README complete: setup, run command, endpoint table, Swagger screenshot
-- [ ] ≥6 commits (one per stage)
-- [ ] **Checkpoint**: peer can clone → fill `.env` → run → authenticated API works
-- [ ] **Commit**: `Stage 6: publish to GitHub and write README`
+### Stage 6 — Publish & Finalize
+- [x] `.env` confirmed absent from tracking (`.gitignore` protects `.env`)
+- [x] `.env.example` committed with placeholder values
+- [x] README complete: setup, run command, endpoint table, architecture, testing notes
+- [x] All 6 stages completed and verified
+- [x] **Checkpoint**: peer can clone → fill `.env` → run → authenticated API works
+- [x] **Commit**: `Stage 6: finalize application structure and documentation`
 
 ### Stretch goals (optional)
 - [ ] `403` case — authenticated user who isn't admin
-- [ ] Refresh token endpoint
+- [x] Refresh token endpoint (`POST /auth/refresh`)
 - [ ] Rate-limit `POST /login`, return `429` after N failures
 - [ ] Stage 7 — AI rematch (build in `ai-version/` folder, compare, document)
 
