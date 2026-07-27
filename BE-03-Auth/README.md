@@ -245,6 +245,38 @@ Setting `GOTRUE_MAILER_AUTOCONFIRM: "true"` on self-hosted means **no emails are
 
 ---
 
+## Python & FastAPI Syntax Notes (Java Dev Cheat Sheet)
+
+Key concepts for developers coming from languages like Java:
+
+### 1. Type Hints vs. Default Values
+In Python, method parameters follow `name: Type = DefaultValue`:
+```python
+credentials: HTTPAuthorizationCredentials | None = Depends(security)
+```
+- **Name:** `credentials`
+- **Type:** `HTTPAuthorizationCredentials | None`
+- **Default / Injector:** `= Depends(security)`
+
+### 2. Union Types (`|`)
+In Python 3.10+, `TypeA | TypeB` means **either TypeA or TypeB**.
+- `HTTPAuthorizationCredentials | None` is equivalent to Java's `Optional<HTTPAuthorizationCredentials>`.
+
+### 3. Square Brackets `[]` vs Parentheses `()`
+- **Parentheses `()`**: Function call or object instantiation at runtime (`my_func()`).
+- **Square Brackets `[]`**: Type parameterization / generics (equivalent to Java `<>` generics).
+  - Java `List<String>` $\rightarrow$ Python `list[str]`
+  - Java `Map<String, Integer>` $\rightarrow$ Python `dict[str, int]`
+  - Java `Annotated<Type, Meta>` $\rightarrow$ Python `Annotated[Type, Meta]`
+
+### 4. Why `Depends()` in parameters instead of Decorators?
+FastAPI uses parameter dependency injection (`Depends()`) instead of decorators (`@require_auth`) because:
+1. The injected value is passed directly as a function argument (no global thread-local state).
+2. IDE autocompletion works out of the box (`credentials.credentials`).
+3. FastAPI reads parameters to build Swagger UI documentation (`securitySchemes`) automatically.
+
+---
+
 
 ## Progress — Stage Checklist
 
@@ -269,11 +301,11 @@ Setting `GOTRUE_MAILER_AUTOCONFIRM: "true"` on self-hosted means **no emails are
 - [x] **Commit**: `Stage 1: signup and login routes working`
 
 ### Stage 2 — Public & unverified protected route
-- [ ] `GET /public/info` returns `200` with welcome message (no auth)
-- [ ] `GET /protected/profile` checks Authorization header is present
-- [ ] Returns `401` if header missing or malformed (no real verification yet)
-- [ ] **Checkpoint**: `/public/info` → 200, `/protected/profile` with no token → 401
-- [ ] **Commit**: `Stage 2: public route and unverified protected route`
+- [x] `GET /public/info` returns `200` with welcome message (no auth)
+- [x] `GET /protected/profile` checks Authorization header is present
+- [x] Returns `401` if header missing or malformed (no real verification yet)
+- [x] **Checkpoint**: `/public/info` → 200, `/protected/profile` with no token → 401
+- [x] **Commit**: `Stage 2: public route and unverified protected route`
 
 ### Stage 3 — Real token verification
 - [ ] `/protected/profile` calls `supabase.auth.get_user(token)` to verify JWT

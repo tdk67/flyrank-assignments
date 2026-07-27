@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 import auth_routes
+import public_routes
+import protected_routes
 
 # ---------------------------------------------------------------------------
 # 3. Create the FastAPI app
@@ -13,9 +15,10 @@ app = FastAPI(
 
 # ---------------------------------------------------------------------------
 # Register routers
-# include_router() mounts all routes from auth_routes under their /auth prefix
 # ---------------------------------------------------------------------------
 app.include_router(auth_routes.router)
+app.include_router(public_routes.router)
+app.include_router(protected_routes.router)
 
 
 @app.get("/")
