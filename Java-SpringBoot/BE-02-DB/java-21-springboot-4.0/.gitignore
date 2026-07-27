@@ -1,0 +1,19 @@
+# Gradle temporary files & build output
+.gradle/
+build/
+
+# Database files
+data/
+*.db
+
+# IDE files
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
