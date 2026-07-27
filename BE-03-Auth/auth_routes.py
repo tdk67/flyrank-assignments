@@ -1,22 +1,13 @@
 import re
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from schemas import AuthCredentials
+from security import UserProfile, get_current_user
 from supabase_client import supabase
 
 # ---------------------------------------------------------------------------
 # Router — all routes here will be mounted under the /auth prefix in main.py
 # ---------------------------------------------------------------------------
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
-
-# ---------------------------------------------------------------------------
-# Request body schema — Pydantic validates that both fields are present.
-# If the client sends no 'email' at all, FastAPI returns 422 automatically.
-# We still check for empty strings ourselves (see below).
-# ---------------------------------------------------------------------------
-class AuthCredentials(BaseModel):
-    email: str
-    password: str
 
 
 # ---------------------------------------------------------------------------
@@ -116,3 +107,20 @@ def login(credentials: AuthCredentials):
         "refresh_token": response.session.refresh_token,
         "token_type": "bearer",
     }
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/logout
+# What happens:
+#   1. Requires a valid JWT token via get_current_user dependency
+#   2. Calls Supabase sign_out() to end the session
+#   3. Returns 204 No Content (empty body)
+# ---------------------------------------------------------------------------
+@router.post("/logout", status_code=204)
+def logout(current_user: UserProfile = Depends(get_current_user)):
+    try:
+        supabase.auth.sign_out(current_user.token)
+    except Exception:
+        # Even if Supabase sign_out raises, the client discards its token locally
+        pass
+    return None

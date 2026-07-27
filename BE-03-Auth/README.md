@@ -315,19 +315,19 @@ FastAPI uses parameter dependency injection (`Depends()`) instead of decorators 
 - [x] **Commit**: `Stage 3: profile route token verification`
 
 ### Stage 4 — Auth middleware & logout
-- [ ] Token verification extracted into a reusable FastAPI `Depends()` function
-- [ ] `GET /protected/profile` uses the dependency (no copy-paste of auth logic)
-- [ ] `GET /protected/dashboard` added — uses same dependency, zero new auth code
-- [ ] `POST /auth/logout` created — calls `supabase.auth.sign_out()`, returns `204`
-- [ ] **Checkpoint**: second protected route works; bad token → 401 on both
-- [ ] **Commit**: `Stage 4: auth middleware and logout endpoint`
+- [x] Token verification extracted into a reusable FastAPI `Depends()` function
+- [x] `GET /protected/profile` uses the dependency (no copy-paste of auth logic)
+- [x] `GET /protected/dashboard` added — uses same dependency, zero new auth code
+- [x] `POST /auth/logout` created — calls `supabase.auth.sign_out()`, returns `204`
+- [x] **Checkpoint**: second protected route works; bad token → 401 on both
+- [x] **Commit**: `Stage 4: auth middleware and logout endpoint`
 
 ### Stage 5 — Swagger UI with bearer auth
-- [ ] FastAPI `HTTPBearer` security scheme configured
-- [ ] Lock icon appears on protected routes in `/docs`
-- [ ] Authorize with a token → Try it out on `/protected/profile` → 200
-- [ ] Screenshot of Swagger taken for README
-- [ ] **Commit**: `Stage 5: Swagger UI documentation with bearer auth`
+- [x] FastAPI `HTTPBearer` security scheme configured
+- [x] Lock icon appears on protected routes in `/docs`
+- [x] Authorize with a token → Try it out on `/protected/profile` → 200
+- [x] Screenshot of Swagger taken for README
+- [x] **Commit**: `Stage 5: Swagger UI documentation with bearer auth`
 
 ### Stage 6 — Publish to GitHub
 - [ ] Public GitHub repo created
