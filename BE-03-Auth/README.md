@@ -349,7 +349,7 @@ FastAPI uses parameter dependency injection (`Depends()`) instead of decorators 
 
 ## Swagger screenshot
 
-*(Add screenshot here after completing Stage 5)*
+![FlyRank Auth API Swagger UI Documentation](./swagger_ui.png)
 
 ---
 
