@@ -308,11 +308,11 @@ FastAPI uses parameter dependency injection (`Depends()`) instead of decorators 
 - [x] **Commit**: `Stage 2: public route and unverified protected route`
 
 ### Stage 3 — Real token verification
-- [ ] `/protected/profile` calls `supabase.auth.get_user(token)` to verify JWT
-- [ ] Returns `401` if token is expired or tampered
-- [ ] Returns `200` with user id, email, created_at on success
-- [ ] **Checkpoint**: valid token → 200, tampered token (change one char) → 401
-- [ ] **Commit**: `Stage 3: profile route token verification`
+- [x] `/protected/profile` calls `supabase.auth.get_user(token)` to verify JWT
+- [x] Returns `401` if token is expired or tampered
+- [x] Returns `200` with user id, email, created_at on success
+- [x] **Checkpoint**: valid token → 200, tampered token (change one char) → 401
+- [x] **Commit**: `Stage 3: profile route token verification`
 
 ### Stage 4 — Auth middleware & logout
 - [ ] Token verification extracted into a reusable FastAPI `Depends()` function
