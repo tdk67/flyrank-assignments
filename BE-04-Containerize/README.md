@@ -652,3 +652,80 @@ curl -i -X POST http://localhost:8000/user \
 ```json
 {"detail": "age: Extra inputs are not permitted"}
 ```
+
+---
+
+## ⚡ Future Improvements: Connection Pool, Scalability & Async DB
+
+> These findings are documented here for future implementation. No code changes are needed now.
+
+### Current State — Best Setup So Far
+
+BE-04 is the most production-ready Python implementation in this series. It already uses SQLAlchemy 2.0 with a real connection pool backed by PostgreSQL.
+
+| Concern | Current State |
+|---|---|
+| **Connection pool** | ✅ SQLAlchemy `create_engine` with `pool_pre_ping=True` — connections are pooled and reused. Default pool size: `5` connections, `max_overflow=10` |
+| **DB** | ✅ PostgreSQL via `psycopg2-binary` — production-grade, multi-writer concurrency |
+| **Session management** | ✅ `get_db()` generator yields a session per request and closes it cleanly in `finally` |
+| **Async** | ❌ Endpoints are still synchronous (plain `def` + `psycopg2` sync driver). A slow DB response blocks the Uvicorn worker thread |
+| **Pool config** | ⚠️ No explicit `pool_size` or `max_overflow` set — running on SQLAlchemy defaults (`pool_size=5`, `max_overflow=10`) |
+
+### Explicit Pool Tuning (implement any time)
+
+```python
+# database.py — tune pool explicitly
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_size=10,         # number of persistent connections
+    max_overflow=20,      # extra connections allowed under burst
+    pool_timeout=30,      # seconds to wait for a connection from pool
+    pool_recycle=1800,    # recycle connections after 30 min (prevents stale connections)
+)
+```
+
+### Async Upgrade Path (implement later)
+
+Switch from `psycopg2` (sync) to `asyncpg` (async) and use SQLAlchemy's async engine:
+
+```bash
+pip install sqlalchemy[asyncio] asyncpg
+# remove psycopg2-binary from requirements.txt
+```
+
+```python
+# database.py
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+engine = create_async_engine(
+    settings.database_url.replace("postgresql://", "postgresql+asyncpg://"),
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+)
+
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        yield session
+```
+
+```python
+# repositories / services — use async session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+async def get_all_users(db: AsyncSession) -> list[UserModel]:
+    result = await db.execute(select(UserModel))
+    return result.scalars().all()
+
+# routes — async def, thread is free while DB responds
+@router.get("/user")
+async def list_users(db: AsyncSession = Depends(get_db)):
+    return await user_service.get_all(db)
+```
+
+This is the natural next step from BE-04: the architecture, PostgreSQL, and Liquibase migrations are already in place — only the driver and session layer change.
+

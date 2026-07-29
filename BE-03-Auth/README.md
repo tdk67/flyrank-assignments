@@ -358,3 +358,78 @@ FastAPI uses parameter dependency injection (`Depends()`) instead of decorators 
 - The **anon key** is safe to use from your app — it respects Supabase Row Level Security
 - The **service_role key** bypasses all security — never use it here, never commit it
 - JWTs are short-lived (1 hour default) — that is intentional
+
+---
+
+## ⚡ Future Improvements: Connection Pool, Scalability & Async
+
+> These findings are documented here for future implementation. No code changes are needed now.
+
+### Current State
+
+BE-03 is a **stateless auth proxy** — it does not connect to its own database. All persistence is delegated to Supabase.
+
+| Concern | Current State |
+|---|---|
+| **Connection pool** | ✅ Managed by the `supabase-py` HTTP client (uses `httpx` under the hood with keep-alive). No manual pool config required. |
+| **Supabase client** | ✅ Single shared client instance created at startup in `supabase_client.py` — no per-request instantiation overhead |
+| **Async** | ❌ Endpoints are plain `def` (run in Uvicorn's thread pool). `supabase-py` sync client makes blocking HTTP calls to Supabase on each auth operation |
+| **Scalability** | ⚠️ Each `supabase.auth.sign_in_with_password()` / `get_user()` call blocks a Uvicorn worker thread until Supabase responds. Under high auth traffic this exhausts the thread pool |
+
+### Risk if Supabase Is Slow
+
+Every JWT verification call (`get_user(token)`) is a synchronous HTTP round-trip to Supabase. If Supabase responds slowly (e.g. network blip), the worker thread is blocked and cannot serve other requests. With default Uvicorn settings this degrades the entire API.
+
+### Upgrade Path (implement later)
+
+**Option A — Async Supabase client (minimal change)**
+
+`supabase-py` ships an async client. Switch to it and make routes `async def`:
+
+```python
+# supabase_client.py
+from supabase._async.client import AsyncClient, create_client as create_async_client
+import asyncio, os
+from dotenv import load_dotenv
+
+load_dotenv()
+supabase: AsyncClient = asyncio.get_event_loop().run_until_complete(
+    create_async_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+)
+```
+
+```python
+# security.py — make get_current_user async
+async def get_current_user(credentials: ...) -> UserProfile:
+    response = await supabase.auth.get_user(token)
+    ...
+
+# protected_routes.py
+@router.get("/profile")
+async def profile(user: UserProfile = Depends(get_current_user)):
+    ...
+```
+
+**Option B — Local JWT verification (zero network round-trip, best for scale)**
+
+Instead of calling Supabase on every request, verify the JWT locally using the Supabase JWT secret:
+
+```bash
+pip install python-jose[cryptography]
+```
+
+```python
+from jose import jwt, JWTError
+
+SUPABASE_JWT_SECRET = os.environ["SUPABASE_JWT_SECRET"]  # from Supabase Dashboard → API → JWT Secret
+
+def verify_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+```
+
+This eliminates the network call entirely — every token check is a local crypto operation, making the endpoint fully non-blocking and zero-latency.
+

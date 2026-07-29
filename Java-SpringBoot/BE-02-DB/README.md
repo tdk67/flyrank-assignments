@@ -97,3 +97,87 @@ Java-SpringBoot/BE-02-DB/
   Hibernate `spring.jpa.hibernate.ddl-auto=validate` strictly checks that every `@Column(nullable = false)` in JPA entities matches the database column nullability and existence created by Flyway. If Flyway creates columns without `NOT NULL` constraints or before Hibernate initializes, schema validation fails.
 * **How to Fix:**
   Ensure Flyway DDL matches JPA entity column definitions (including `NOT NULL` and `DEFAULT` constraints) and set `spring.jpa.hibernate.ddl-auto=validate` (or `update`).
+
+---
+
+## ⚡ Future Improvements: Connection Pool, Scalability & Reactive DB
+
+> These findings are documented here for future implementation. No code changes are needed now.
+
+### Current State Across All Flavors
+
+| Concern | All Three Flavors |
+|---|---|
+| **Connection pool** | ✅ HikariCP — auto-configured by `spring-boot-starter-data-jpa`. Defaults: `max-pool-size=10`, `connection-timeout=30s` |
+| **ORM** | Spring Data JPA / Hibernate — `JpaRepository` scales cleanly as endpoints are added |
+| **Async** | ❌ Blocking — `spring-boot-starter-web` uses the Tomcat servlet stack. Every request holds a thread while waiting for the DB |
+| **DB ceiling** | ⚠️ H2 file-backed DB (like SQLite) has a single-writer constraint. For real concurrency, switch to PostgreSQL |
+
+### Risk if DB Is Slow
+
+HikariCP buffers bursts up to `max-pool-size=10` connections. If those 10 threads are all waiting on a slow DB query, new requests queue at the pool gate until `connection-timeout` (30 s) elapses, after which they fail with `SQLTransientConnectionException`. The Tomcat thread is tied up for the full DB wait duration.
+
+### Quick Mitigation (Hikari Tuning — implement any time)
+
+Add to `application.properties` in any flavor:
+
+```properties
+# Tune HikariCP for higher concurrency
+spring.datasource.hikari.maximum-pool-size=20
+spring.datasource.hikari.connection-timeout=5000
+spring.datasource.hikari.idle-timeout=600000
+spring.datasource.hikari.max-lifetime=1800000
+```
+
+### Full Reactive Upgrade Path
+
+**Java flavor → WebFlux + R2DBC**
+
+```kotlin
+// build.gradle.kts — replace web + jpa + h2 with:
+implementation("org.springframework.boot:spring-boot-starter-webflux")
+implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
+implementation("io.r2dbc:r2dbc-h2")          // or r2dbc-postgresql for prod
+```
+
+```java
+// TaskRepository.java
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
+
+public interface TaskRepository extends ReactiveCrudRepository<TaskEntity, Long> {
+    Flux<TaskEntity> findByTitleContainingIgnoreCase(String search);
+}
+
+// TaskController.java — thread is freed while DB responds
+@GetMapping("/tasks")
+public Flux<TaskResponse> list() {
+    return service.getAll();
+}
+```
+
+**Kotlin flavor → Coroutines + R2DBC (recommended — looks like normal code)**
+
+```kotlin
+// build.gradle.kts — replace web + jpa + h2 with:
+implementation("org.springframework.boot:spring-boot-starter-webflux")
+implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
+implementation("io.r2dbc:r2dbc-h2")
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+```
+
+```kotlin
+// TaskRepository.kt
+import org.springframework.data.repository.kotlin.CoroutineCrudRepository
+
+interface TaskRepository : CoroutineCrudRepository<TaskEntity, Long> {
+    suspend fun findByDone(done: Boolean): List<TaskEntity>
+}
+
+// TaskController.kt — suspend = non-blocking, no thread held during DB wait
+@GetMapping("/tasks")
+suspend fun listTasks(): List<TaskResponse> = service.getAll().map { it.toResponse() }
+```
+
+Kotlin coroutines are the lowest-friction path: code reads like blocking code but never parks a thread while the DB is thinking.
+

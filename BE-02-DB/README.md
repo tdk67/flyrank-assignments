@@ -218,3 +218,68 @@ DELETE FROM tasks WHERE done = 1;
 ### 📝 Stage 4 Direct DB Exploration Observation
 > **Exploration Query**: `UPDATE tasks SET done = 1 WHERE id = 2;`
 > **Result & Observation**: Executing this update directly inside DBeaver instantly modified the underlying `tasks.db` file. Calling `GET /tasks/2` via the FastAPI backend immediately returned `"done": true` without requiring an API server restart—confirming that the SQLite database file serves as the single source of truth for both DBeaver and the API.
+
+---
+
+## ⚡ Future Improvements: Connection Pool, Scalability & Async DB
+
+> These findings are documented here for future implementation. No code changes are needed now.
+
+### Current State — What This Implementation Does
+
+| Concern | Current State |
+|---|---|
+| **Connection pool** | ❌ None — `_get_connection()` opens a fresh `sqlite3.connect()` on every call and closes it at the end |
+| **Concurrency** | ⚠️ SQLite has a single-writer file lock; concurrent writes queue behind it |
+| **Async** | ❌ Endpoints are plain `def` (run in Uvicorn's thread pool). `sqlite3` is synchronous; a slow DB call blocks the thread |
+
+### Risk if DB Is Slow
+
+Because `sqlite3` is blocking and there is no pool, a slow DB response holds a Uvicorn worker thread for the entire duration. Under load this exhausts the thread pool and new requests start queuing.
+
+### Upgrade Path (implement later)
+
+**Option A — Minimal: `aiosqlite` (keep SQLite, go async)**
+
+```bash
+pip install aiosqlite
+```
+
+```python
+# database.py
+import aiosqlite
+
+async def get_all(self, ...) -> list[TaskDTO]:
+    async with aiosqlite.connect(self.db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.execute("SELECT id, title, done, created_at, updated_at FROM tasks") as cursor:
+            rows = await cursor.fetchall()
+    return [TaskDTO(...) for row in rows]
+```
+
+Routes must be `async def`:
+
+```python
+# task_routes.py
+@router.get("/tasks")
+async def list_tasks(...):
+    return await service.get_all(...)
+```
+
+**Option B — Production grade: PostgreSQL + `asyncpg` + SQLAlchemy async**
+
+```bash
+pip install sqlalchemy[asyncio] asyncpg
+```
+
+```python
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+
+engine = create_async_engine(
+    "postgresql+asyncpg://user:pass@localhost/tasks",
+    pool_size=10,       # real connection pool
+    max_overflow=20,
+)
+```
+
+This provides true async non-blocking DB I/O and a connection pool in one move, and lifts the SQLite single-writer ceiling.
