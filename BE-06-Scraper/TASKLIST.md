@@ -72,28 +72,28 @@ Use this tasklist to track implementation progress across the 4 execution phases
 
 ## Phase 3: Stage 3 — Kaggle Target (`kaggle.com/datasets`)
 
-- [ ] **3.1** Implement `targets/kaggle_target.py`
-  - [ ] Implement Playwright headless browser automation / API interceptor
-  - [ ] Wait for client-side React DOM hydration
-  - [ ] Extract title, dataset URL, creator, upvotes, views, downloads, license, description, tags, last updated date
-- [ ] **3.2** Data Cleaning & Pydantic Validation
-  - [ ] Implement `cleaner/kaggle_cleaner.py` (Metric parsing, tag list cleaning)
-  - [ ] Define `schemas.py` `DatasetRecord` model
-- [ ] **3.3** Testing & Verification
-  - [ ] Write `tests/unit/test_kaggle_cleaner.py`
-  - [ ] Run live smoke test: `python main.py scrape --target kaggle --query "machine learning" --limit 5`
-  - [ ] Verify PostgreSQL `datasets` table records and `kaggle.jsonl` output
+- [x] **3.1** Implement `targets/kaggle_target.py`
+  - [x] Implement Playwright headless browser automation / API interceptor
+  - [x] Wait for client-side React DOM hydration
+  - [x] Extract title, dataset URL, creator, upvotes, views, downloads, license, description, tags, last updated date
+- [x] **3.2** Data Cleaning & Pydantic Validation
+  - [x] Implement `cleaner/kaggle_cleaner.py` (Metric parsing, tag list cleaning)
+  - [x] Define `schemas.py` `DatasetRecord` model
+- [x] **3.3** Testing & Verification
+  - [x] Write `tests/unit/test_kaggle_cleaner.py`
+  - [x] Run live smoke test: `python main.py scrape --target kaggle --query "machine learning" --limit 5`
+  - [x] Verify PostgreSQL / SQLite `datasets` table records and `kaggle.jsonl` output
 
 ---
 
 ## Phase 4: Final Verification, Multi-Target RAG Export & Docs
 
-- [ ] **4.1** Full Test Suite Execution
-  - [ ] Run `pytest` (Unit + Integration tests)
-  - [ ] Verify 100% backward compatibility across all 3 CLI target modes
-- [ ] **4.2** Final RAG Datasets Generation
-  - [ ] Generate `rag_corpus_books.jsonl`
-  - [ ] Generate `rag_corpus_leads.jsonl`
-  - [ ] Generate `rag_corpus_kaggle.jsonl`
-- [ ] **4.3** Project Documentation
-  - [ ] Write `BE-06-Scraper/README.md` with setup, execution, architecture, and RAG export instructions.
+- [x] **4.1** Full Test Suite Execution
+  - [x] Run `pytest` (Unit + Integration tests)
+  - [x] Verify 100% backward compatibility across all 3 CLI target modes
+- [x] **4.2** Final RAG Datasets Generation
+  - [x] Generate `rag_corpus_books.jsonl`
+  - [x] Generate `rag_corpus_leads.jsonl`
+  - [x] Generate `rag_corpus_kaggle.jsonl`
+- [x] **4.3** Project Documentation
+  - [x] Write `BE-06-Scraper/README.md` with setup, execution, architecture, and RAG export instructions.

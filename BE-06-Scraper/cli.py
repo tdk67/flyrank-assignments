@@ -56,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="machine learning",
         help="Search query for kaggle strategy (default: machine learning)"
     )
+    scrape_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Maximum dataset items to retrieve for kaggle strategy (default: 5)"
+    )
 
     return parser
 
@@ -81,7 +87,11 @@ async def main_async():
             records = await strategy.run(max_pages=args.max_pages, output_file=output, city=args.city, street=args.street)
             print(f"\n[+] Completed B2B Leads Scrape: {len(records)} leads exported to {output}")
         elif args.target == "kaggle":
-            print(f"[!] Kaggle target strategy will be implemented in Stage 3.")
+            from targets.kaggle_target import KaggleTargetStrategy
+            strategy = KaggleTargetStrategy()
+            output = args.output or "kaggle.jsonl"
+            records = await strategy.run(max_pages=args.max_pages, output_file=output, query=args.query, limit=args.limit)
+            print(f"\n[+] Completed Kaggle Dataset Scrape: {len(records)} datasets exported to {output}")
 
 
 def main():
