@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 from bs4 import BeautifulSoup
 import httpx
 from cleaner.leads_cleaner import build_dasoertliche_url, parse_json_ld_lead
@@ -13,7 +12,8 @@ from core.politeness import (
     get_retry_decorator,
 )
 from schemas import LeadRecord
-from storage.rag_exporter import RAGExporter
+from storage.database import SessionLocal
+from storage.repository import Repository
 
 logger = logging.getLogger("BE-06-Scraper.LeadsTarget")
 
@@ -58,7 +58,6 @@ class LeadsTargetStrategy(BaseTargetStrategy):
             return []
 
         if "<title>Fehlermeldung</title>" in html_content or "Keine Treffer" in html_content:
-            logger.info("Page returned 'Keine Treffer' or error page.")
             return []
 
         soup = BeautifulSoup(html_content, "html.parser")
@@ -86,54 +85,55 @@ class LeadsTargetStrategy(BaseTargetStrategy):
                         lead = parse_json_ld_lead(item, default_city, default_street, page_url)
                         if lead:
                             leads.append(lead)
-            except json.JSONDecodeError as e:
-                logger.debug(f"JSON-LD parse error: {e}")
+            except json.JSONDecodeError:
                 continue
 
         return leads
 
-    async def run(self, max_pages: int = 1, output_file: str | None = None, **kwargs) -> list[LeadRecord]:
+    async def run(self, max_pages: int = 1, **kwargs) -> list[LeadRecord]:
         city = kwargs.get("city", "Berlin")
         street = kwargs.get("street", "Berliner Allee")
 
         logger.info(f"Starting B2B Leads Scraper for City: '{city}', Street: '{street}', Max Pages: {max_pages}")
+        scrape_log = self.create_scrape_log()
+
+        db = SessionLocal()
+        repo = Repository(db)
+        repo.save_scrape_log(scrape_log)
+
         self.robots_parser.fetch_robots_txt(self.BASE_URL)
-
         records: list[LeadRecord] = []
+        pages_scraped = 0
+        error_count = 0
 
-        async with httpx.AsyncClient() as client:
-            for page_num in range(1, max_pages + 1):
-                page_url = build_dasoertliche_url(street, city, page_num)
-                logger.info(f"Fetching leads page {page_num}/{max_pages}: {page_url}")
-
-                html_content = await self.fetch_html(client, page_url)
-                if not html_content:
-                    logger.info("No content returned. Stopping pagination.")
-                    break
-
-                page_leads = self.parse_json_ld_from_html(html_content, city, street, page_url)
-                if not page_leads:
-                    logger.info(f"No B2B leads found on page {page_num}. Ending pagination.")
-                    break
-
-                logger.info(f"Extracted {len(page_leads)} B2B lead(s) from page {page_num}")
-                for lead in page_leads:
-                    records.append(lead)
-                    logger.info(f"Extracted lead: [{lead.id}] {lead.business_name} ({lead.city}, {lead.phone_number or 'No Phone'})")
-
-        out_path = output_file or "leads.jsonl"
-        saved_file = RAGExporter.export_to_jsonl(records, out_path)
-        logger.info(f"Successfully scraped {len(records)} B2B lead(s). Saved output to {saved_file}")
-
-        # DB persistence (Postgres / local SQLite fallback)
         try:
-            from storage.database import SessionLocal
-            from storage.repository import Repository
-            db = SessionLocal()
-            saved_db_count = Repository(db).upsert_leads(records)
-            db.close()
-            logger.info(f"Persisted {saved_db_count} B2B lead record(s) to database.")
+            async with httpx.AsyncClient() as client:
+                for page_num in range(1, max_pages + 1):
+                    page_url = build_dasoertliche_url(street, city, page_num)
+                    logger.info(f"Fetching leads page {page_num}/{max_pages}: {page_url}")
+
+                    html_content = await self.fetch_html(client, page_url)
+                    if not html_content:
+                        break
+
+                    pages_scraped += 1
+                    page_leads = self.parse_json_ld_from_html(html_content, city, street, page_url)
+                    if not page_leads:
+                        break
+
+                    records.extend(page_leads)
+
+            # Persist records to database
+            repo.upsert_leads(records)
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="COMPLETED")
+            repo.save_scrape_log(scrape_log)
+            logger.info(f"Successfully scraped & stored {len(records)} B2B leads into database.")
         except Exception as e:
-            logger.warning(f"Could not persist to database: {e}")
+            error_count += 1
+            logger.error(f"Leads scraping failed: {e}")
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="FAILED")
+            repo.save_scrape_log(scrape_log)
+        finally:
+            db.close()
 
         return records

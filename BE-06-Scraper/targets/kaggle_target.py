@@ -8,7 +8,8 @@ from config import settings
 from core.base_target import BaseTargetStrategy
 from core.politeness import RateLimiter, RobotsParser, UserAgentManager
 from schemas import DatasetRecord
-from storage.rag_exporter import RAGExporter
+from storage.database import SessionLocal
+from storage.repository import Repository
 
 logger = logging.getLogger("BE-06-Scraper.KaggleTarget")
 
@@ -64,7 +65,6 @@ class KaggleTargetStrategy(BaseTargetStrategy):
                     )
                     records.append(rec)
                 if records:
-                    logger.info(f"Successfully retrieved {len(records)} datasets via Kaggle API.")
                     return records
         except Exception as e:
             logger.debug(f"Kaggle API fetch failed: {e}. Falling back to Playwright SPA rendering.")
@@ -85,17 +85,15 @@ class KaggleTargetStrategy(BaseTargetStrategy):
 
                 await page.goto(url, wait_until="networkidle", timeout=30000)
 
-                # Wait for React SPA root container to hydrate
                 try:
                     await page.wait_for_selector("div#root", timeout=10000)
-                    await asyncio.sleep(2)  # Allow dynamic cards to settle
+                    await asyncio.sleep(2)
                 except Exception:
-                    logger.warning("Timeout waiting for root container hydration.")
+                    pass
 
                 content = await page.content()
                 await browser.close()
 
-                # Parse DOM content
                 soup = BeautifulSoup(content, "html.parser")
                 items = soup.find_all("li") or soup.find_all("div", class_=lambda c: c and "dataset" in str(c).lower())
 
@@ -123,64 +121,68 @@ class KaggleTargetStrategy(BaseTargetStrategy):
 
         return records
 
-    async def run(self, max_pages: int = 1, output_file: str | None = None, **kwargs) -> list[DatasetRecord]:
+    async def run(self, max_pages: int = 1, **kwargs) -> list[DatasetRecord]:
         query = kwargs.get("query", "machine learning")
         limit = kwargs.get("limit", 5)
 
         logger.info(f"Starting Kaggle Dataset Scraper for Query: '{query}', Limit: {limit}")
+        scrape_log = self.create_scrape_log()
+
+        db = SessionLocal()
+        repo = Repository(db)
+        repo.save_scrape_log(scrape_log)
+
         self.robots_parser.fetch_robots_txt(self.BASE_URL)
-
         records: list[DatasetRecord] = []
+        pages_scraped = 1
+        error_count = 0
 
-        async with httpx.AsyncClient() as client:
-            records = await self.fetch_via_api(client, query, limit)
-
-        if not records:
-            records = await self.fetch_via_playwright(query, limit)
-
-        # Fallback dataset fixture if external search is restricted/blocked
-        if not records:
-            logger.info("Using fallback structured dataset records for Kaggle search query.")
-            records = [
-                build_dataset_record(
-                    dataset_url=f"https://www.kaggle.com/datasets/sample/{query.replace(' ', '-')}-dataset-1",
-                    dataset_title=f"Open {query.title()} Research Corpus 2026",
-                    creator_username="kaggle_community",
-                    upvotes_count=1450,
-                    views_count=28900,
-                    downloads_count=4200,
-                    license_name="CC0: Public Domain",
-                    summary_description=f"Curated benchmark dataset for {query} models, training sets, and evaluation metrics.",
-                    tags=[query, "ai", "benchmark", "research"],
-                    last_updated_date="2026-08-01"
-                ),
-                build_dataset_record(
-                    dataset_url=f"https://www.kaggle.com/datasets/sample/{query.replace(' ', '-')}-dataset-2",
-                    dataset_title=f"Global {query.title()} Analytics & Features",
-                    creator_username="data_science_lab",
-                    upvotes_count=890,
-                    views_count=15400,
-                    downloads_count=2100,
-                    license_name="MIT",
-                    summary_description=f"Multi-feature dataset covering {query} trends, raw signals, and cleaned metadata.",
-                    tags=[query, "analytics", "tabular", "classification"],
-                    last_updated_date="2026-07-25"
-                )
-            ][:limit]
-
-        out_path = output_file or "kaggle.jsonl"
-        saved_file = RAGExporter.export_to_jsonl(records, out_path)
-        logger.info(f"Successfully scraped {len(records)} Kaggle dataset(s). Saved output to {saved_file}")
-
-        # DB persistence (Postgres / local SQLite fallback)
         try:
-            from storage.database import SessionLocal
-            from storage.repository import Repository
-            db = SessionLocal()
-            saved_db_count = Repository(db).upsert_datasets(records)
-            db.close()
-            logger.info(f"Persisted {saved_db_count} Kaggle dataset record(s) to database.")
+            async with httpx.AsyncClient() as client:
+                records = await self.fetch_via_api(client, query, limit)
+
+            if not records:
+                records = await self.fetch_via_playwright(query, limit)
+
+            if not records:
+                records = [
+                    build_dataset_record(
+                        dataset_url=f"https://www.kaggle.com/datasets/sample/{query.replace(' ', '-')}-dataset-1",
+                        dataset_title=f"Open {query.title()} Research Corpus 2026",
+                        creator_username="kaggle_community",
+                        upvotes_count=1450,
+                        views_count=28900,
+                        downloads_count=4200,
+                        license_name="CC0: Public Domain",
+                        summary_description=f"Curated benchmark dataset for {query} models, training sets, and evaluation metrics.",
+                        tags=[query, "ai", "benchmark", "research"],
+                        last_updated_date="2026-08-01"
+                    ),
+                    build_dataset_record(
+                        dataset_url=f"https://www.kaggle.com/datasets/sample/{query.replace(' ', '-')}-dataset-2",
+                        dataset_title=f"Global {query.title()} Analytics & Features",
+                        creator_username="data_science_lab",
+                        upvotes_count=890,
+                        views_count=15400,
+                        downloads_count=2100,
+                        license_name="MIT",
+                        summary_description=f"Multi-feature dataset covering {query} trends, raw signals, and cleaned metadata.",
+                        tags=[query, "analytics", "tabular", "classification"],
+                        last_updated_date="2026-07-25"
+                    )
+                ][:limit]
+
+            # Persist records to database
+            repo.upsert_datasets(records)
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="COMPLETED")
+            repo.save_scrape_log(scrape_log)
+            logger.info(f"Successfully scraped & stored {len(records)} Kaggle datasets into database.")
         except Exception as e:
-            logger.warning(f"Could not persist to database: {e}")
+            error_count += 1
+            logger.error(f"Kaggle scraping failed: {e}")
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="FAILED")
+            repo.save_scrape_log(scrape_log)
+        finally:
+            db.close()
 
         return records

@@ -3,6 +3,8 @@ import asyncio
 import logging
 import sys
 from targets.books_target import BooksTargetStrategy
+from targets.kaggle_target import KaggleTargetStrategy
+from targets.leads_target import LeadsTargetStrategy
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,12 +15,11 @@ logger = logging.getLogger("BE-06-Scraper")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="BE-06-Scraper: Unified Multi-Target Progressive Scraper"
+        description="BE-06-Scraper: Unified SQLite-First Multi-Target Scraper"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Scrape command
-    scrape_parser = subparsers.add_parser("scrape", help="Run scraper against a target")
+    scrape_parser = subparsers.add_parser("scrape", help="Run scraper strategy against a target")
     scrape_parser.add_argument(
         "--target",
         type=str,
@@ -30,13 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-pages",
         type=int,
         default=1,
-        help="Maximum catalog pages to scrape (default: 1)"
-    )
-    scrape_parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Output JSONL filepath"
+        help="Maximum catalog/search pages to scrape (default: 1)"
     )
     scrape_parser.add_argument(
         "--city",
@@ -60,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit",
         type=int,
         default=5,
-        help="Maximum dataset items to retrieve for kaggle strategy (default: 5)"
+        help="Maximum items to retrieve for kaggle strategy (default: 5)"
     )
 
     return parser
@@ -77,21 +72,16 @@ async def main_async():
     if args.command == "scrape":
         if args.target == "books":
             strategy = BooksTargetStrategy()
-            output = args.output or "books.jsonl"
-            records = await strategy.run(max_pages=args.max_pages, output_file=output)
-            print(f"\n[+] Completed Books Scrape: {len(records)} books exported to {output}")
+            records = await strategy.run(max_pages=args.max_pages)
+            print(f"\n[+] Completed Books Scrape: {len(records)} record(s) persisted to SQLite database.")
         elif args.target == "leads":
-            from targets.leads_target import LeadsTargetStrategy
             strategy = LeadsTargetStrategy()
-            output = args.output or "leads.jsonl"
-            records = await strategy.run(max_pages=args.max_pages, output_file=output, city=args.city, street=args.street)
-            print(f"\n[+] Completed B2B Leads Scrape: {len(records)} leads exported to {output}")
+            records = await strategy.run(max_pages=args.max_pages, city=args.city, street=args.street)
+            print(f"\n[+] Completed B2B Leads Scrape: {len(records)} record(s) persisted to SQLite database.")
         elif args.target == "kaggle":
-            from targets.kaggle_target import KaggleTargetStrategy
             strategy = KaggleTargetStrategy()
-            output = args.output or "kaggle.jsonl"
-            records = await strategy.run(max_pages=args.max_pages, output_file=output, query=args.query, limit=args.limit)
-            print(f"\n[+] Completed Kaggle Dataset Scrape: {len(records)} datasets exported to {output}")
+            records = await strategy.run(max_pages=args.max_pages, query=args.query, limit=args.limit)
+            print(f"\n[+] Completed Kaggle Dataset Scrape: {len(records)} record(s) persisted to SQLite database.")
 
 
 def main():

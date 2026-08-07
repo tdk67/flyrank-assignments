@@ -17,7 +17,8 @@ from core.politeness import (
     get_retry_decorator,
 )
 from schemas import BookRecord
-from storage.rag_exporter import RAGExporter
+from storage.database import SessionLocal
+from storage.repository import Repository
 
 logger = logging.getLogger("BE-06-Scraper.BooksTarget")
 
@@ -40,7 +41,7 @@ class BooksTargetStrategy(BaseTargetStrategy):
         if not self.robots_parser.can_fetch(url):
             logger.warning(f"Robots.txt disallows fetching {url}")
             return ""
-        
+
         await self.rate_limiter.wait()
 
         @get_retry_decorator(max_attempts=settings.MAX_RETRIES)
@@ -65,7 +66,7 @@ class BooksTargetStrategy(BaseTargetStrategy):
             return None
 
         title = clean_text(main_div.find("h1").get_text()) if main_div.find("h1") else "Unknown Title"
-        
+
         # Rating
         rating_elem = main_div.find("p", class_=lambda c: c and "star-rating" in c)
         rating_class = " ".join(rating_elem.get("class", [])) if rating_elem else ""
@@ -85,7 +86,7 @@ class BooksTargetStrategy(BaseTargetStrategy):
         if desc_p and desc_p.find_next_sibling("p"):
             description = clean_text(desc_p.find_next_sibling("p").get_text())
 
-        # Product Table (UPC, Price excl tax, Price incl tax, Tax, Availability)
+        # Product Table (UPC, Price, Tax, Availability)
         upc = ""
         price_excl_tax = 0.0
         price_incl_tax = 0.0
@@ -142,58 +143,59 @@ class BooksTargetStrategy(BaseTargetStrategy):
             cover_image_url=cover_url,
         )
 
-    async def run(self, max_pages: int = 1, output_file: str | None = None, **kwargs) -> list[BookRecord]:
+    async def run(self, max_pages: int = 1, **kwargs) -> list[BookRecord]:
         logger.info(f"Starting Books Scraper run for max {max_pages} page(s)...")
+        scrape_log = self.create_scrape_log()
+
+        db = SessionLocal()
+        repo = Repository(db)
+        repo.save_scrape_log(scrape_log)
+
         self.robots_parser.fetch_robots_txt(self.BASE_URL)
-
         records: list[BookRecord] = []
+        pages_scraped = 0
+        error_count = 0
 
-        async with httpx.AsyncClient() as client:
-            for page_num in range(1, max_pages + 1):
-                page_url = self.CATALOG_URL.format(page_num)
-                logger.info(f"Fetching catalog page {page_num}/{max_pages}: {page_url}")
-                catalog_html = await self.fetch_html(client, page_url)
-                if not catalog_html:
-                    logger.warning(f"Empty content for catalog page {page_num}. Stopping pagination.")
-                    break
-
-                soup = BeautifulSoup(catalog_html, "html.parser")
-                product_pods = soup.find_all("article", class_="product_pod")
-                if not product_pods:
-                    logger.info("No product pods found on page. Ending pagination.")
-                    break
-
-                logger.info(f"Found {len(product_pods)} books on catalog page {page_num}")
-                for pod in product_pods:
-                    h3 = pod.find("h3")
-                    if not h3 or not h3.find("a"):
-                        continue
-                    rel_url = h3.find("a").get("href")
-                    # Handle relative URL resolution (catalog/ page links)
-                    if not rel_url.startswith("catalogue/"):
-                        rel_url = f"catalogue/{rel_url.lstrip('/')}"
-                    detail_url = urljoin(self.BASE_URL, rel_url)
-
-                    logger.debug(f"Fetching detail page: {detail_url}")
-                    detail_html = await self.fetch_html(client, detail_url)
-                    book_rec = self.parse_detail_page(detail_html, detail_url)
-                    if book_rec:
-                        records.append(book_rec)
-                        logger.info(f"Extracted book: [{book_rec.upc}] {book_rec.title} (£{book_rec.price_incl_tax:.2f})")
-
-        out_path = output_file or "books.jsonl"
-        saved_file = RAGExporter.export_to_jsonl(records, out_path)
-        logger.info(f"Successfully scraped {len(records)} books. Saved output to {saved_file}")
-
-        # Persist to database (PostgreSQL or local SQLite fallback)
         try:
-            from storage.database import SessionLocal
-            from storage.repository import Repository
-            db = SessionLocal()
-            saved_db_count = Repository(db).upsert_books(records)
-            db.close()
-            logger.info(f"Persisted {saved_db_count} book record(s) to database.")
+            async with httpx.AsyncClient() as client:
+                for page_num in range(1, max_pages + 1):
+                    page_url = self.CATALOG_URL.format(page_num)
+                    logger.info(f"Fetching catalog page {page_num}/{max_pages}: {page_url}")
+                    catalog_html = await self.fetch_html(client, page_url)
+                    if not catalog_html:
+                        break
+
+                    pages_scraped += 1
+                    soup = BeautifulSoup(catalog_html, "html.parser")
+                    product_pods = soup.find_all("article", class_="product_pod")
+                    if not product_pods:
+                        break
+
+                    for pod in product_pods:
+                        h3 = pod.find("h3")
+                        if not h3 or not h3.find("a"):
+                            continue
+                        rel_url = h3.find("a").get("href")
+                        if not rel_url.startswith("catalogue/"):
+                            rel_url = f"catalogue/{rel_url.lstrip('/')}"
+                        detail_url = urljoin(self.BASE_URL, rel_url)
+
+                        detail_html = await self.fetch_html(client, detail_url)
+                        book_rec = self.parse_detail_page(detail_html, detail_url)
+                        if book_rec:
+                            records.append(book_rec)
+
+            # Persist records to database
+            repo.upsert_books(records)
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="COMPLETED")
+            repo.save_scrape_log(scrape_log)
+            logger.info(f"Successfully scraped & stored {len(records)} books into database.")
         except Exception as e:
-            logger.warning(f"Could not persist to database: {e}")
+            error_count += 1
+            logger.error(f"Books scraping failed: {e}")
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="FAILED")
+            repo.save_scrape_log(scrape_log)
+        finally:
+            db.close()
 
         return records

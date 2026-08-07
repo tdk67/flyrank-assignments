@@ -1,23 +1,19 @@
 # Implementation Tasklist & Progress Tracker (`TASKLIST.md`)
 
-Use this tasklist to track implementation progress across the 4 execution phases of **BE-06-Scraper**.
+Use this tasklist to track implementation progress across all phases of **BE-06-Scraper**.
 
 ---
 
 ## Phase 0: Project Setup & Core Infrastructure Framework
 
 - [x] **0.1** Environment & Dependencies
-  - [x] Create `requirements.txt` (`httpx`, `beautifulsoup4`, `playwright`, `pydantic`, `sqlalchemy`, `psycopg2-binary`, `tenacity`)
+  - [x] Create `requirements.txt` (`httpx`, `beautifulsoup4`, `playwright`, `pydantic`, `sqlalchemy`, `tenacity`)
   - [x] Create `requirements-dev.txt` (`pytest`, `pytest-asyncio`)
   - [x] Create `.env.example` and `config.py` configuration loader
 
-- [x] **0.2** Docker & Database Migrations (Liquibase)
-  - [x] Create `docker-compose.yml` (Postgres 16 + `db-migrate` Liquibase service)
-  - [x] Create `db/changelog/db.changelog-master.xml`
-  - [x] Create `001_create_books_table.sql`
-  - [x] Create `002_create_leads_table.sql`
-  - [x] Create `003_create_datasets_table.sql`
-  - [x] Create `004_create_scrape_logs_table.sql`
+- [x] **0.2** SQLite Database Setup
+  - [x] Configure SQLite engine (`flyrank_scraper.db`) in `storage/database.py`
+  - [x] Define SQLAlchemy models for `Book`, `Lead`, `Dataset`, and `ScrapeLog` in `storage/models.py`
 
 - [x] **0.3** Politeness & Ethics Engine (`core/politeness.py`)
   - [x] Implement `RobotsParser` (`urllib.robotparser` wrapper with 404/403 fallback handling)
@@ -26,9 +22,8 @@ Use this tasklist to track implementation progress across the 4 execution phases
   - [x] Implement `RetryBackoff` (`tenacity` exponential backoff for `429`/`5xx`)
 
 - [x] **0.4** Strategy Engine & Storage Sinks
-  - [x] Create `core/base_target.py` (`BaseTargetStrategy` Abstract Base Class)
-  - [x] Create `storage/repository.py` (SQLAlchemy ORM models & UPSERT functions)
-  - [x] Create `storage/rag_exporter.py` (JSONL RAG text chunk exporter)
+  - [x] Create `core/base_target.py` (`BaseTargetStrategy` ABC with `ScrapeLog` tracking)
+  - [x] Create `storage/repository.py` (SQLite UPSERT repository for all 4 models)
   - [x] Create `main.py` & `cli.py` (Unified CLI entrypoint supporting `--target [books|leads|kaggle]`)
 
 ---
@@ -45,7 +40,7 @@ Use this tasklist to track implementation progress across the 4 execution phases
 - [x] **1.3** Testing & Verification
   - [x] Write `tests/unit/test_books_cleaner.py`
   - [x] Run live smoke test: `python main.py scrape --target books --max-pages 1`
-  - [x] Verify PostgreSQL `books` table records and `books.jsonl` output
+  - [x] Verify SQLite `books` and `scrape_logs` table records
 
 ---
 
@@ -66,7 +61,7 @@ Use this tasklist to track implementation progress across the 4 execution phases
   - [x] Test Pair 3: `München + Leopoldstraße`
   - [x] Test Pair 4: `Hamburg + Reeperbahn`
   - [x] Test Pair 5: `Frankfurt + Kaiserstraße`
-  - [x] Verify PostgreSQL `leads` table records and `leads.jsonl` output
+  - [x] Verify SQLite `leads` and `scrape_logs` table records
 
 ---
 
@@ -82,18 +77,30 @@ Use this tasklist to track implementation progress across the 4 execution phases
 - [x] **3.3** Testing & Verification
   - [x] Write `tests/unit/test_kaggle_cleaner.py`
   - [x] Run live smoke test: `python main.py scrape --target kaggle --query "machine learning" --limit 5`
-  - [x] Verify PostgreSQL / SQLite `datasets` table records and `kaggle.jsonl` output
+  - [x] Verify SQLite `datasets` and `scrape_logs` table records
 
 ---
 
-## Phase 4: Final Verification, Multi-Target RAG Export & Docs
+## Phase 4: Refactoring & Architecture Verification
 
 - [x] **4.1** Full Test Suite Execution
-  - [x] Run `pytest` (Unit + Integration tests)
+  - [x] Run `pytest` (Unit tests across all target strategies)
   - [x] Verify 100% backward compatibility across all 3 CLI target modes
-- [x] **4.2** Final RAG Datasets Generation
-  - [x] Generate `rag_corpus_books.jsonl`
-  - [x] Generate `rag_corpus_leads.jsonl`
-  - [x] Generate `rag_corpus_kaggle.jsonl`
-- [x] **4.3** Project Documentation
-  - [x] Write `BE-06-Scraper/README.md` with setup, execution, architecture, and RAG export instructions.
+- [x] **4.2** SQLite Database Verification
+  - [x] Verify `flyrank_scraper.db` untracked in `.gitignore`
+  - [x] Verify `scrape_logs` populated on every scrape session
+
+---
+
+## Phase 5: Streamlit Live Demo Frontend (`app.py`)
+
+- [ ] **5.1** Dependencies
+  - [ ] Add `streamlit>=1.35.0` to `requirements.txt`
+- [ ] **5.2** Streamlit App (`app.py`)
+  - [ ] Implement Sidebar controls (Target selector, parameters)
+  - [ ] Implement Hybrid execution wrapper calling `asyncio.run(strategy.run(...))`
+  - [ ] Implement Tab 1: Live Data Grid (`st.dataframe`)
+  - [ ] Implement Tab 2: Record Detail Inspector
+  - [ ] Implement Tab 3: Scraping Session History Log Viewer (reading `scrape_logs` from SQLite DB)
+- [ ] **5.3** Testing & Verification
+  - [ ] Run Streamlit app (`streamlit run app.py`) and verify live scraping demo

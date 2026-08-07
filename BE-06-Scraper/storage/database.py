@@ -6,26 +6,17 @@ from storage.models import Base
 
 logger = logging.getLogger("BE-06-Scraper.Database")
 
-def create_db_engine():
-    try:
-        engine = create_engine(
-            settings.database_url,
-            pool_pre_ping=True,
-            echo=False
-        )
-        # Test connection
-        with engine.connect() as conn:
-            pass
-        logger.info(f"Connected to PostgreSQL database at {settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}")
-        return engine
-    except Exception as e:
-        logger.warning(f"Could not connect to PostgreSQL ({e}). Falling back to local SQLite database (flyrank_scraper.db).")
-        sqlite_url = "sqlite:///./flyrank_scraper.db"
-        sqlite_engine = create_engine(sqlite_url, echo=False)
-        Base.metadata.create_all(bind=sqlite_engine)
-        return sqlite_engine
+# Create SQLite engine with thread check disabled for multithreaded GUI/async compatibility
+engine = create_engine(
+    settings.DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    echo=False
+)
 
-engine = create_db_engine()
+# Auto-create all tables in SQLite database on startup
+Base.metadata.create_all(bind=engine)
+logger.info(f"Initialized SQLite database at {settings.DATABASE_URL}")
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
