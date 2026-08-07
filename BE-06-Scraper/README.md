@@ -60,12 +60,12 @@ To combine high learning value with software engineering best practices, `BE-06-
 
 ## 2. Benchmark Test Examples & Test Pairs
 
-Below are 5 curated benchmark test pairs for Stage 2 (Das Örtliche German B2B Leads) demonstrating URL slug resolution, street abbreviation handling, and administrative city variant matching:
+Below are 5 curated benchmark test pairs for Stage 2 (Das Örtliche German B2B Leads) demonstrating OpenStreetMap geocoding resolution, street abbreviation handling, and administrative city variant matching:
 
 | # | Test City | Test Street | Target Das Örtliche URL | Key Handling Feature Tested |
 | :-: | :--- | :--- | :--- | :--- |
 | **1** | `Neu-Isenburg` | `Frankfurter Straße` | [Frankfurter-Str/Neu--Isenburg.htm](https://www.dasoertliche.de/Themen/Frankfurter-Str/Neu--Isenburg.htm) | Abbreviation fallback (`Str` vs `Straße`) & Hyphenation |
-| **2** | `Freiburg` | `Willy-Brandt-Allee` | [Willy--Brandt--Allee/Freiburg-im-Breisgau.htm](https://www.dasoertliche.de/Themen/Willy--Brandt--Allee/Freiburg-im-Breisgau.htm) | City variant resolution (`Freiburg` $\rightarrow$ `Freiburg im Breisgau`) |
+| **2** | `Freiburg` | `Willy-Brandt-Allee` | [Willy--Brandt--Allee/Freiburg-im-Breisgau.htm](https://www.dasoertliche.de/Themen/Willy--Brandt--Allee/Freiburg-im-Breisgau.htm) | OpenStreetMap Geocoding (`Freiburg` $\rightarrow$ `Freiburg im Breisgau`) |
 | **3** | `Frankfurt am Main` | `Ludwig Erhard Anlage` | [Ludwig--Erhard--Anlage/Frankfurt-am-Main.htm](https://www.dasoertliche.de/Themen/Ludwig--Erhard--Anlage/Frankfurt-am-Main.htm) | Space-to-hyphen encoding & batch lead deduplication |
 | **4** | `Bad Homburg von der Höhe` | `Kaiser-Friedrich-Promenade` | [Kaiser--Friedrich--Promenade/Bad-Homburg-v-d-Höhe.htm](https://www.dasoertliche.de/Themen/Kaiser--Friedrich--Promenade/Bad-Homburg-v-d-Höhe.htm) | Administrative prefix mapping (`von der` $\rightarrow$ `v-d-`) |
 | **5** | `Dietzenbach` | `Max Planck Straße` | [Max--Planck--Str/Dietzenbach.htm](https://www.dasoertliche.de/Themen/Max--Planck--Str/Dietzenbach.htm) | Multi-word space encoding & `Str` fallback resolution |
@@ -97,7 +97,7 @@ Here is a detailed breakdown of all files in the solution and their specific rol
 
 | File Path | Description / Responsibility |
 | :--- | :--- |
-| **`app.py`** | **Streamlit Live Demo Frontend**: Interactive dashboard featuring target launcher, live dataset grid, record inspector, and audit log viewer. |
+| **`app.py`** | **Streamlit Live Demo Frontend**: Interactive dashboard featuring target launcher, direct results tab, database explorer, record inspector, and audit log viewer. |
 | **`main.py`** | Primary application execution entrypoint. Invokes CLI parser and async main loop. |
 | **`cli.py`** | Command-Line Interface module using `argparse`. Defines flags (`--target`, `--max-pages`, `--city`, `--street`, `--query`, `--limit`). |
 | **`config.py`** | Settings manager using `pydantic-settings`. Loads `.env`, manages SQLite database URL. |
@@ -106,10 +106,10 @@ Here is a detailed breakdown of all files in the solution and their specific rol
 | **`core/politeness.py`** | Ethics middleware: `RobotsParser` (`robots.txt` compliance), `RateLimiter` (token-bucket delay), `UserAgentManager`, `RetryBackoff` (`tenacity`). |
 | **`core/base_target.py`** | Abstract Base Class `BaseTargetStrategy` defining strategy interface and automated `ScrapeLog` session tracking. |
 | **`targets/books_target.py`** | **Stage 1 Strategy**: Async HTTP fetcher & BeautifulSoup4 DOM parser for `books.toscrape.com`. |
-| **`targets/leads_target.py`** | **Stage 2 Strategy**: German street & city URL transformer, JSON-LD microdata extractor, and B2B vs. Person filter for `dasoertliche.de`. |
+| **`targets/leads_target.py`** | **Stage 2 Strategy**: German street & city URL transformer with OpenStreetMap geocoding, JSON-LD microdata extractor, and B2B vs. Person filter for `dasoertliche.de`. |
 | **`targets/kaggle_target.py`** | **Stage 3 Strategy**: Playwright headless browser / REST API interceptor for `kaggle.com/datasets`. |
 | **`cleaner/books_cleaner.py`** | Cleaning utilities for books: currency float parser, rating word-to-int mapper, stock quantity regex, HTML unescaper. |
-| **`cleaner/leads_cleaner.py`** | Cleaning utilities for leads: German street/city variant generator, JSON-LD lead parser, phone number regex cleaner. |
+| **`cleaner/leads_cleaner.py`** | Cleaning utilities for leads: OpenStreetMap Nominatim geocoder, German street/city variant generator, JSON-LD lead parser, phone number regex cleaner. |
 | **`cleaner/kaggle_cleaner.py`** | Cleaning utilities for datasets: metric count parser (`"1.5k"` $\rightarrow$ `1500`), tag normalizer. |
 | **`storage/models.py`** | SQLAlchemy ORM declarative models (`Book`, `Lead`, `Dataset`, `ScrapeLog`). |
 | **`storage/database.py`** | SQLite database engine setup, auto-creation of tables, and session factory (`SessionLocal`). |
@@ -124,7 +124,7 @@ Here is a detailed breakdown of all files in the solution and their specific rol
 | :--- | :--- |
 | **`streamlit`** | Interactive web application framework used to build the live demo dashboard (`app.py`). |
 | **`pandas`** | Data analysis library used to format database query outputs into interactive data grids. |
-| **`httpx`** | High-performance, async HTTP client used for non-blocking page fetching and REST API requests. |
+| **`httpx`** | High-performance, async HTTP client used for non-blocking page fetching, OpenStreetMap geocoding, and REST API requests. |
 | **`beautifulsoup4`** | HTML/XML parser used for navigating the DOM tree and extracting fields via CSS selectors. |
 | **`pydantic`** | Data validation and typing library enforcing strict data contracts and rejecting unknown fields. |
 | **`pydantic-settings`** | Environment variable management mapping `.env` files directly into typed Python settings objects. |
@@ -172,7 +172,7 @@ All settings are configured via environment variables or `.env` files and loaded
 
 ---
 
-### Running the Streamlit Live Demo UI
+### Running the Streamlit Live Demo UI Locally
 
 To launch the interactive visual dashboard:
 
@@ -182,10 +182,10 @@ python -m streamlit run app.py
 
 This automatically opens your browser at **`http://localhost:8501`**, offering:
 - **Interactive Scraper Launcher**: Run `Books`, `B2B Leads`, or `Kaggle Datasets` scrapers with custom parameters or preset test pairs.
-- **Direct Results Tab**: View freshly extracted records from the active session.
-- **SQLite Database Explorer**: Search, sort, and filter all historical records by city or target.
-- **Detailed Record Inspector**: View structured fields side-by-side with metadata and original page links.
-- **Scraping Session Audit Logs**: Monitor session start/end times, pages scraped, extracted record counts, and status (`COMPLETED` / `FAILED`).
+- **Direct Scrape Results Tab**: View ONLY the freshly extracted records from the active session.
+- **SQLite Database Explorer Tab**: Search, sort, and filter all historical records by city or target.
+- **Detailed Record Inspector Tab**: View structured fields side-by-side with metadata and original page links.
+- **Scraping Session Audit Logs Tab**: Monitor session start/end times, pages scraped, extracted record counts, and status (`COMPLETED` / `FAILED`).
 
 ---
 
@@ -210,7 +210,58 @@ python main.py scrape --target kaggle --query "machine learning" --limit 5
 
 ---
 
-## 7. Testing Section
+## 7. Deployment Guide
+
+### Option A: Deploying to Streamlit Community Cloud (Free Cloud Hosting)
+
+Streamlit Community Cloud hosts Streamlit applications directly from your GitHub repository:
+
+1. **Push Workspace to GitHub**:
+   Ensure your code is pushed to your GitHub repository (e.g. `github.com/your-username/BE-06-Scraper`).
+
+2. **Sign in to Streamlit Community Cloud**:
+   Go to [share.streamlit.io](https://share.streamlit.io) and log in using your GitHub account.
+
+3. **Deploy New App**:
+   - Click **"New app"** $\rightarrow$ **"Use existing repo"**.
+   - **Repository**: Select `your-username/BE-06-Scraper`
+   - **Branch**: `main`
+   - **Main file path**: `app.py`
+
+4. **Configure Secrets / Environment Variables**:
+   Click **Advanced settings...** and paste your `.env` variables under **Secrets**:
+   ```toml
+   DATABASE_URL = "sqlite:///./flyrank_scraper.db"
+   USER_AGENT = "FlyrankBot/1.0 (+https://github.com/flyrank)"
+   DEFAULT_RATE_LIMIT_DELAY = "0.5"
+   MAX_RETRIES = "3"
+   ```
+
+5. **Launch**:
+   Click **Deploy!**. Streamlit will build your app and provide a shareable public URL (e.g., `https://flyrank-scraper.streamlit.app`).
+
+---
+
+### Option B: Deploying via Docker (Self-Hosted Cloud Server)
+
+You can package and deploy `BE-06-Scraper` on any cloud container service (AWS ECS, Google Cloud Run, Azure Container Apps, DigitalOcean):
+
+1. **Build Docker Image**:
+   ```bash
+   docker build -t flyrank-scraper-ui -f Dockerfile .
+   ```
+
+2. **Run Container Locally or on Cloud Server**:
+   ```bash
+   docker run -d -p 8501:8501 --name scraper-app flyrank-scraper-ui
+   ```
+
+3. **Access Dashboard**:
+   Open `http://localhost:8501` (or your cloud server's IP address).
+
+---
+
+## 8. Testing Section
 
 The project features a full test suite powered by `pytest` and `pytest-asyncio`.
 
