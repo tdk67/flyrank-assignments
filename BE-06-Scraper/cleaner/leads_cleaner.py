@@ -1,8 +1,12 @@
 import hashlib
 import html
+import logging
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List
+import httpx
 from schemas import LeadRecord
+
+logger = logging.getLogger("BE-06-Scraper.LeadsCleaner")
 
 BUSINESS_TYPES = {
     "localbusiness", "organization", "restaurant", "foodestablishment",
@@ -16,16 +20,77 @@ BUSINESS_TYPES = {
 
 def encode_street_for_url(street: str) -> str:
     cleaned = re.sub(r"['\"]", "", street)
-    doubled_hyphens = cleaned.replace("-", "--")
+    split_camel = re.sub(r"([a-zäöüß])([A-ZÄÖÜ])", r"\1 \2", cleaned)
+    doubled_hyphens = split_camel.replace("-", "--")
     spaced_hyphens = re.sub(r"\s+", "-", doubled_hyphens)
     return spaced_hyphens.strip("-")
 
 
 def encode_city_for_url(city: str) -> str:
     cleaned = re.sub(r"['\"]", "", city)
-    doubled_hyphens = cleaned.replace("-", "--")
+    split_camel = re.sub(r"([a-zäöüß])([A-ZÄÖÜ])", r"\1 \2", cleaned)
+    doubled_hyphens = split_camel.replace("-", "--")
     spaced_hyphens = re.sub(r"\s+", "-", doubled_hyphens)
     return spaced_hyphens.strip("-")
+
+
+def resolve_city_via_osm(city: str, street: str = "") -> str | None:
+    """Use OpenStreetMap Nominatim API to resolve informal city names to official administrative names."""
+    url = f"https://nominatim.openstreetmap.org/search?city={city}&street={street}&country=Germany&format=json&addressdetails=1"
+    headers = {"User-Agent": "FlyrankBot/1.0 (https://github.com/flyrank)"}
+    try:
+        res = httpx.get(url, headers=headers, timeout=4.0)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                addr = data[0].get("address", {})
+                official_city = addr.get("town") or addr.get("city") or addr.get("municipality")
+                if official_city:
+                    logger.info(f"OpenStreetMap Geocoder resolved city '{city}' -> '{official_city}'")
+                    return official_city
+    except Exception as e:
+        logger.debug(f"OSM geocoding lookup skipped/failed: {e}")
+    return None
+
+
+def generate_city_variants(city: str, street: str = "") -> List[str]:
+    """Generate candidate URL slugs using OpenStreetMap geocoding and German administrative rules."""
+    variants = [city]
+
+    # Level 1: OpenStreetMap Geocoding Lookup
+    osm_official = resolve_city_via_osm(city, street)
+    if osm_official and osm_official not in variants:
+        variants.append(osm_official)
+
+    # Level 2: Rule-Based Administrative Transformations
+    extra_variants = []
+    for c in list(variants):
+        c_lower = c.lower()
+        if "von der" in c_lower:
+            extra_variants.append(re.sub(r"von der", "v d", c, flags=re.IGNORECASE))
+            extra_variants.append(re.sub(r"von der.*", "", c, flags=re.IGNORECASE).strip())
+
+        if "ob der" in c_lower:
+            extra_variants.append(re.sub(r"ob der", "o d", c, flags=re.IGNORECASE))
+            extra_variants.append(re.sub(r"ob der.*", "", c, flags=re.IGNORECASE).strip())
+
+        if "am main" in c_lower:
+            extra_variants.append(re.sub(r"am main", "a M", c, flags=re.IGNORECASE))
+            extra_variants.append(re.sub(r"am main.*", "", c, flags=re.IGNORECASE).strip())
+
+        if "an der" in c_lower:
+            extra_variants.append(re.sub(r"an der", "a d", c, flags=re.IGNORECASE))
+            extra_variants.append(re.sub(r"an der.*", "", c, flags=re.IGNORECASE).strip())
+
+        if "im breisgau" in c_lower:
+            extra_variants.append(re.sub(r"im breisgau", "i Br", c, flags=re.IGNORECASE))
+            extra_variants.append(re.sub(r"im breisgau.*", "", c, flags=re.IGNORECASE).strip())
+
+        if "(" in c:
+            extra_variants.append(re.sub(r"\s*\([^)]*\)", "", c).strip())
+
+    variants.extend(extra_variants)
+    return list(dict.fromkeys(variants))
 
 
 def build_dasoertliche_url(street: str, city: str, page_num: int = 1) -> str:
@@ -63,23 +128,19 @@ def parse_json_ld_lead(item: Dict[str, Any], default_city: str, default_street: 
     raw_type = item.get("@type", "")
     types_list = [t.lower() for t in (raw_type if isinstance(raw_type, list) else [raw_type]) if isinstance(t, str)]
 
-    # 1. Filter out explicit private persons
     if "person" in types_list:
         return None
 
-    # 2. Check if business
     is_business = any(any(bt in t for bt in BUSINESS_TYPES) for t in types_list)
     raw_phone = item.get("telephone") or item.get("phone")
     phone_number = clean_phone_number(raw_phone)
 
-    # Require either business type OR valid phone number
     if not is_business and not phone_number:
         return None
 
     business_name = html.unescape(str(item["name"])).strip()
     category_industry = types_list[0].capitalize() if types_list else "LocalBusiness"
 
-    # Address parsing
     address_obj = item.get("address", {})
     if isinstance(address_obj, str):
         address_obj = {"streetAddress": address_obj}
@@ -93,7 +154,6 @@ def parse_json_ld_lead(item: Dict[str, Any], default_city: str, default_street: 
         street_address = address_obj.get("streetAddress", "")
         if street_address:
             street_address = html.unescape(street_address).strip()
-            # Split street and house number
             match = re.match(r"^(.+?)\s+(\d+[\w\-]*)$", street_address)
             if match:
                 street_name = match.group(1).strip()
@@ -109,7 +169,6 @@ def parse_json_ld_lead(item: Dict[str, Any], default_city: str, default_street: 
     website_url = clean_website_url(item.get("url") or item.get("website"))
     detail_page_url = page_url or item.get("mainEntityOfPage") or item.get("sameAs")
 
-    # Generate composite lead ID
     composite_str = f"{business_name.lower()}|{street_name.lower()}|{city.lower()}"
     lead_id = hashlib.sha256(composite_str.encode("utf-8")).hexdigest()[:16]
 

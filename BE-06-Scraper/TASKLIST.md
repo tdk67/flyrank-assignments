@@ -94,13 +94,13 @@ Use this tasklist to track implementation progress across all phases of **BE-06-
 
 ## Phase 5: Streamlit Live Demo Frontend (`app.py`)
 
-- [ ] **5.1** Dependencies
-  - [ ] Add `streamlit>=1.35.0` to `requirements.txt`
-- [ ] **5.2** Streamlit App (`app.py`)
-  - [ ] Implement Sidebar controls (Target selector, parameters)
-  - [ ] Implement Hybrid execution wrapper calling `asyncio.run(strategy.run(...))`
-  - [ ] Implement Tab 1: Live Data Grid (`st.dataframe`)
-  - [ ] Implement Tab 2: Record Detail Inspector
-  - [ ] Implement Tab 3: Scraping Session History Log Viewer (reading `scrape_logs` from SQLite DB)
-- [ ] **5.3** Testing & Verification
-  - [ ] Run Streamlit app (`streamlit run app.py`) and verify live scraping demo
+- [x] **5.1** Dependencies
+  - [x] Add `streamlit>=1.35.0` to `requirements.txt`
+- [x] **5.2** Streamlit App (`app.py`)
+  - [x] Implement Sidebar controls (Target selector, parameters)
+  - [x] Implement Hybrid execution wrapper calling `asyncio.run(strategy.run(...))`
+  - [x] Implement Tab 1: Live Data Grid (`st.dataframe`)
+  - [x] Implement Tab 2: Record Detail Inspector
+  - [x] Implement Tab 3: Scraping Session History Log Viewer (reading `scrape_logs` from SQLite DB)
+- [x] **5.3** Testing & Verification
+  - [x] Run Streamlit app (`streamlit run app.py`) and verify live scraping demo

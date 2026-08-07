@@ -2,9 +2,16 @@ import json
 import logging
 from bs4 import BeautifulSoup
 import httpx
-from cleaner.leads_cleaner import build_dasoertliche_url, parse_json_ld_lead
+from cleaner.leads_cleaner import (
+    build_dasoertliche_url,
+    encode_city_for_url,
+    encode_street_for_url,
+    generate_city_variants,
+    parse_json_ld_lead,
+)
 from config import settings
 from core.base_target import BaseTargetStrategy
+from core.exceptions import InvalidSearchLocationError
 from core.politeness import (
     RateLimiter,
     RobotsParser,
@@ -31,7 +38,7 @@ class LeadsTargetStrategy(BaseTargetStrategy):
     def target_name(self) -> str:
         return "leads"
 
-    async def fetch_html(self, client: httpx.AsyncClient, url: str) -> str:
+    async def fetch_html(self, client: httpx.AsyncClient, url: str, city: str = "", street: str = "", page_num: int = 1) -> str:
         if not self.robots_parser.can_fetch(url):
             logger.warning(f"Robots.txt disallows fetching {url}")
             return ""
@@ -41,14 +48,20 @@ class LeadsTargetStrategy(BaseTargetStrategy):
         @get_retry_decorator(max_attempts=settings.MAX_RETRIES)
         async def _do_fetch():
             res = await client.get(url, headers=self.ua_manager.get_headers(), timeout=10.0)
-            if res.status_code == 410:
-                logger.info(f"HTTP 410 Gone for {url} — end of pagination.")
-                return ""
+            if res.status_code in (404, 410):
+                if page_num > 1:
+                    logger.info(f"End of pagination reached at page {page_num} (HTTP {res.status_code}).")
+                    return ""
+                msg = f"Invalid search location: Street '{street}' in City '{city}' returned HTTP {res.status_code} on Das Örtliche. Please check spelling."
+                logger.warning(msg)
+                raise InvalidSearchLocationError(msg)
             res.raise_for_status()
             return res.text
 
         try:
             return await _do_fetch()
+        except InvalidSearchLocationError:
+            raise
         except Exception as e:
             logger.error(f"Failed to fetch {url}: {e}")
             return ""
@@ -106,14 +119,38 @@ class LeadsTargetStrategy(BaseTargetStrategy):
         pages_scraped = 0
         error_count = 0
 
-        try:
-            async with httpx.AsyncClient() as client:
-                for page_num in range(1, max_pages + 1):
-                    page_url = build_dasoertliche_url(street, city, page_num)
-                    logger.info(f"Fetching leads page {page_num}/{max_pages}: {page_url}")
+        # Generate street variants
+        street_variants = [street]
+        if "straße" in street.lower() or "strasse" in street.lower():
+            street_variants.append(street.replace("Straße", "Str").replace("strasse", "Str"))
 
-                    html_content = await self.fetch_html(client, page_url)
+        # Generate city variants with OpenStreetMap Geocoding
+        city_variants = generate_city_variants(city, street)
+
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                for page_num in range(1, max_pages + 1):
+                    html_content = ""
+
+                    # Try combination of street and city variants
+                    for c_var in city_variants:
+                        for s_var in street_variants:
+                            page_url = build_dasoertliche_url(s_var, c_var, page_num)
+                            try:
+                                html_content = await self.fetch_html(client, page_url, city=c_var, street=s_var, page_num=page_num)
+                                if html_content:
+                                    break
+                            except InvalidSearchLocationError:
+                                if page_num > 1:
+                                    break
+                                continue
+                        if html_content:
+                            break
+
                     if not html_content:
+                        if page_num == 1:
+                            msg = f"No B2B leads found for street '{street}' in city '{city}'. Please verify street and city spelling."
+                            raise InvalidSearchLocationError(msg)
                         break
 
                     pages_scraped += 1
@@ -128,11 +165,17 @@ class LeadsTargetStrategy(BaseTargetStrategy):
             self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="COMPLETED")
             repo.save_scrape_log(scrape_log)
             logger.info(f"Successfully scraped & stored {len(records)} B2B leads into database.")
+        except InvalidSearchLocationError as e:
+            error_count += 1
+            self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=0, error_count=error_count, status="FAILED")
+            repo.save_scrape_log(scrape_log)
+            raise e
         except Exception as e:
             error_count += 1
             logger.error(f"Leads scraping failed: {e}")
             self.finalize_scrape_log(scrape_log, pages_scraped=pages_scraped, records_extracted=len(records), error_count=error_count, status="FAILED")
             repo.save_scrape_log(scrape_log)
+            raise e
         finally:
             db.close()
 
