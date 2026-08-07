@@ -51,22 +51,22 @@ Use this tasklist to track implementation progress across the 4 execution phases
 
 ## Phase 2: Stage 2 — Leads Target (`dasoertliche.de` B2B Leads)
 
-- [ ] **2.1** Implement `targets/leads_target.py`
-  - [ ] Implement German street URL builder (`Karl-Marx-Straße` $\rightarrow$ `Karl--Marx--Straße`)
-  - [ ] Implement JSON-LD microdata tag extractor (`<script type="application/ld+json">`)
-  - [ ] Implement B2B vs. Private Person filter rules
-  - [ ] Extract name, industry category, street, house number, postal code, city, phone, website
-- [ ] **2.2** Data Cleaning & Pydantic Validation
-  - [ ] Implement `cleaner/leads_cleaner.py` (Phone regex cleaner, directory link stripper)
-  - [ ] Define `schemas.py` `LeadRecord` model
-- [ ] **2.3** Testing & Verification across Test Pairs
-  - [ ] Write `tests/unit/test_leads_cleaner.py`
-  - [ ] Test Pair 1: `Berlin + Berliner Allee`
-  - [ ] Test Pair 2: `Berlin + Friedrichstraße`
-  - [ ] Test Pair 3: `München + Leopoldstraße`
-  - [ ] Test Pair 4: `Hamburg + Reeperbahn`
-  - [ ] Test Pair 5: `Frankfurt + Kaiserstraße`
-  - [ ] Verify PostgreSQL `leads` table records and `leads.jsonl` output
+- [x] **2.1** Implement `targets/leads_target.py`
+  - [x] Implement German street URL builder (`Karl-Marx-Straße` $\rightarrow$ `Karl--Marx--Straße`)
+  - [x] Implement JSON-LD microdata tag extractor (`<script type="application/ld+json">`)
+  - [x] Implement B2B vs. Private Person filter rules
+  - [x] Extract name, industry category, street, house number, postal code, city, phone, website
+- [x] **2.2** Data Cleaning & Pydantic Validation
+  - [x] Implement `cleaner/leads_cleaner.py` (Phone regex cleaner, directory link stripper)
+  - [x] Define `schemas.py` `LeadRecord` model
+- [x] **2.3** Testing & Verification across Test Pairs
+  - [x] Write `tests/unit/test_leads_cleaner.py`
+  - [x] Test Pair 1: `Berlin + Berliner Allee`
+  - [x] Test Pair 2: `Berlin + Friedrichstraße`
+  - [x] Test Pair 3: `München + Leopoldstraße`
+  - [x] Test Pair 4: `Hamburg + Reeperbahn`
+  - [x] Test Pair 5: `Frankfurt + Kaiserstraße`
+  - [x] Verify PostgreSQL `leads` table records and `leads.jsonl` output
 
 ---
 

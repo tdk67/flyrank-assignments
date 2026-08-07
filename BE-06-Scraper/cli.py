@@ -75,7 +75,11 @@ async def main_async():
             records = await strategy.run(max_pages=args.max_pages, output_file=output)
             print(f"\n[+] Completed Books Scrape: {len(records)} books exported to {output}")
         elif args.target == "leads":
-            print(f"[!] Leads target strategy will be implemented in Stage 2.")
+            from targets.leads_target import LeadsTargetStrategy
+            strategy = LeadsTargetStrategy()
+            output = args.output or "leads.jsonl"
+            records = await strategy.run(max_pages=args.max_pages, output_file=output, city=args.city, street=args.street)
+            print(f"\n[+] Completed B2B Leads Scrape: {len(records)} leads exported to {output}")
         elif args.target == "kaggle":
             print(f"[!] Kaggle target strategy will be implemented in Stage 3.")
 
