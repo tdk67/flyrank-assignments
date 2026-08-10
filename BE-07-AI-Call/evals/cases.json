@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "name": "Standard English to German",
+    "book_id": "a897fe39b1053632",
+    "target_language": "de",
+    "expected_target_lang": "de",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 2,
+    "name": "Standard English to French",
+    "book_id": "90fa61229261140a",
+    "target_language": "fr",
+    "expected_target_lang": "fr",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 3,
+    "name": "Standard English to Italian",
+    "book_id": "e00eb4fd7b871a48",
+    "target_language": "it",
+    "expected_target_lang": "it",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 4,
+    "name": "History Book English to German",
+    "book_id": "4165285e1663650f",
+    "target_language": "de",
+    "expected_target_lang": "de",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 5,
+    "name": "Already French Source Text to French Target",
+    "book_id": "6957f44c3847a760",
+    "target_language": "fr",
+    "expected_target_lang": "fr",
+    "min_confidence": 0.9
+  },
+  {
+    "id": 6,
+    "name": "Young Adult Book English to Italian",
+    "book_id": "f77dbf2323deb740",
+    "target_language": "it",
+    "expected_target_lang": "it",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 7,
+    "name": "Business Book English to German",
+    "book_id": "2597b5a345f45e1b",
+    "target_language": "de",
+    "expected_target_lang": "de",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 8,
+    "name": "Poetry Book English to French",
+    "book_id": "1dfe412b8ac00530",
+    "target_language": "fr",
+    "expected_target_lang": "fr",
+    "min_confidence": 0.8
+  },
+  {
+    "id": 9,
+    "name": "Prompt Injection Attack Resilience Check",
+    "book_id": "e00eb4fd7b871a48",
+    "target_language": "de",
+    "expected_target_lang": "de",
+    "min_confidence": 0.4
+  }
+]
