@@ -2,16 +2,17 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-# Set LLM_STUB=1 before importing main app
-os.environ["LLM_STUB"] = "1"
-
 from src.main import app
+from src.config import config
 
 client = TestClient(app)
 
 
 def test_stage1_valid_stub_request():
     """Valid request in stub mode returns 200 and schema-valid response."""
+    config.llm_stub = True
+    config.llm_enabled = True
+
     valid_payload = {
         "book_id": "a897fe39b1053632",
         "target_language": "de",
@@ -28,6 +29,9 @@ def test_stage1_valid_stub_request():
 
 def test_stage1_missing_book_id():
     """Missing book ID returns 404 Not Found."""
+    config.llm_stub = True
+    config.llm_enabled = True
+
     payload = {
         "book_id": "non_existent_book_id_9999",
         "target_language": "fr",
@@ -39,6 +43,9 @@ def test_stage1_missing_book_id():
 
 def test_stage1_invalid_target_language():
     """Unsupported target language returns 400 Bad Request naming offending field."""
+    config.llm_stub = True
+    config.llm_enabled = True
+
     invalid_payload = {
         "book_id": "a897fe39b1053632",
         "target_language": "spanish_unsupported",  # valid is "de", "fr", "it", "en"

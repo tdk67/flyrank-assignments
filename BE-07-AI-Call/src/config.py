@@ -4,20 +4,18 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-load_dotenv()
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_JSON_PATH = PROJECT_ROOT / "config.json"
 
 
 class AppConfig(BaseModel):
     # From config.json (Strictly required from config.json - ZERO hardcoded fallbacks!)
-    timeout_seconds: float = Field(..., description="LLM client timeout in seconds")
+    timeout_seconds: float = Field(..., description="Overall wall-clock timeout cap for the translation request in seconds")
     max_network_retries: int = Field(..., description="Max backoff retries for 429/5xx errors")
     max_repair_retries: int = Field(..., description="Max repair retries for schema validation failures")
     prompt_version: str = Field(..., description="Current system prompt version")
     allowed_languages: list[str] = Field(..., description="Supported target language ISO codes")
-    books_dataset_path: str = Field(..., description="Path to scraped books dataset (e.g. ../BE-06-Scraper/books.jsonl)")
+    books_dataset_path: str = Field(..., description="Path to scraped books dataset")
     prompts_dir: str = Field(..., description="Directory containing prompt template files")
     logs_dir: str = Field(..., description="Directory containing log files")
 
@@ -55,6 +53,8 @@ class AppConfig(BaseModel):
     @classmethod
     def load(cls) -> "AppConfig":
         """Loads configuration from config.json and .env. Fails fast if ANY setting is missing."""
+        load_dotenv()
+
         if not CONFIG_JSON_PATH.exists():
             raise FileNotFoundError(
                 f"❌ Configuration Error: Mandatory configuration file '{CONFIG_JSON_PATH}' is missing!"
@@ -67,25 +67,33 @@ class AppConfig(BaseModel):
                 raise ValueError(f"❌ Configuration Error: 'config.json' contains invalid JSON: {e}")
 
         # Fetch environment variables
+        stub_raw = os.getenv("LLM_STUB", "0").strip().lower()
+        enabled_raw = os.getenv("LLM_ENABLED", "true").strip().lower()
+
         env_data = {
             "llm_base_url": os.getenv("LLM_BASE_URL", "").strip(),
             "llm_api_key": os.getenv("LLM_API_KEY", "").strip(),
             "llm_model": os.getenv("LLM_MODEL", "").strip(),
-            "llm_stub": os.getenv("LLM_STUB", "0").strip() in ("1", "true", "True"),
-            "llm_enabled": os.getenv("LLM_ENABLED", "true").strip() not in ("0", "false", "False"),
+            "llm_stub": stub_raw in ("1", "true", "yes", "on"),
+            "llm_enabled": enabled_raw in ("1", "true", "yes", "on"),
         }
 
-        # Strict validation: Check for missing secrets
         missing_secrets = [k.upper() for k, v in env_data.items() if k in ("llm_base_url", "llm_api_key", "llm_model") and not v]
         if missing_secrets:
             raise ValueError(
                 f"❌ Configuration Error: Missing required environment variable(s) in .env: {', '.join(missing_secrets)}"
             )
 
-        # Merge config.json settings and .env secrets
         merged = {**json_data, **env_data}
         return cls.model_validate(merged)
 
 
-# Singleton Config Instance
+# Global singleton instance
 config = AppConfig.load()
+
+
+def reload_config() -> AppConfig:
+    """Reloads config from disk and environment for test isolation (C3 fix)."""
+    global config
+    config = AppConfig.load()
+    return config

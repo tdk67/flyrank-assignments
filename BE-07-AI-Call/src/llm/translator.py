@@ -1,23 +1,56 @@
 import json
+import logging
 import random
 import time
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
 
+import httpx
 from openai import OpenAI, APITimeoutError, APIStatusError, AuthenticationError, BadRequestError, PermissionDeniedError
 from pydantic import ValidationError
 
 from src.config import config
 from src.llm.schema import TranslationResponse
 
+logger = logging.getLogger("be07.translator")
+
+_CACHED_SYSTEM_PROMPT: Optional[str] = None
+_CLIENT_INSTANCE: Optional[OpenAI] = None
+
+
+def get_client() -> OpenAI:
+    """Returns application-lifetime OpenAI client instance configured with httpx timeout."""
+    global _CLIENT_INSTANCE
+    if _CLIENT_INSTANCE is None:
+        http_client = httpx.Client(
+            timeout=httpx.Timeout(config.timeout_seconds, connect=10.0),
+        )
+        _CLIENT_INSTANCE = OpenAI(
+            base_url=config.llm_base_url,
+            api_key=config.llm_api_key,
+            http_client=http_client,
+            max_retries=0,  # Handled by custom backoff loop
+        )
+    return _CLIENT_INSTANCE
+
+
+def reset_client():
+    """Resets client instance on config reload (C3 Fix)."""
+    global _CLIENT_INSTANCE, _CACHED_SYSTEM_PROMPT
+    _CLIENT_INSTANCE = None
+    _CACHED_SYSTEM_PROMPT = None
+
 
 def load_system_prompt() -> str:
-    """Loads system prompt from versioned file specified in config.json."""
-    prompt_file = config.resolved_prompt_file_path
-    if not prompt_file.exists():
-        raise FileNotFoundError(f"System prompt file not found at {prompt_file}")
-    with open(prompt_file, "r", encoding="utf-8") as f:
-        return f.read()
+    """Loads and caches system prompt from versioned file specified in config.json."""
+    global _CACHED_SYSTEM_PROMPT
+    if _CACHED_SYSTEM_PROMPT is None:
+        prompt_file = config.resolved_prompt_file_path
+        if not prompt_file.exists():
+            raise FileNotFoundError(f"System prompt file not found at {prompt_file}")
+        with open(prompt_file, "r", encoding="utf-8") as f:
+            _CACHED_SYSTEM_PROMPT = f.read()
+    return _CACHED_SYSTEM_PROMPT
 
 
 def strip_code_fences(text: str) -> str:
@@ -33,6 +66,13 @@ def strip_code_fences(text: str) -> str:
     return cleaned
 
 
+def append_jsonl(filepath: Path, data: Dict[str, Any]):
+    """Helper to append structured JSON log lines to a file safely."""
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    with open(filepath, "a", encoding="utf-8") as f:
+        f.write(json.dumps(data) + "\n")
+
+
 def log_cost(
     model: str,
     prompt_version: str,
@@ -40,10 +80,9 @@ def log_cost(
     completion_tokens: int,
     duration_ms: float,
     repaired: bool,
+    success: bool = True,
 ):
-    """Logs structured cost line to configured cost log file."""
-    cost_log_file = config.resolved_cost_log_path
-    cost_log_file.parent.mkdir(parents=True, exist_ok=True)
+    """Logs structured cost line to logs/costs.jsonl."""
     entry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "prompt_version": prompt_version,
@@ -53,15 +92,13 @@ def log_cost(
         "total_tokens": prompt_tokens + completion_tokens,
         "duration_ms": round(duration_ms, 2),
         "repaired": repaired,
+        "success": success,
     }
-    with open(cost_log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
+    append_jsonl(config.resolved_cost_log_path, entry)
 
 
 def log_to_quarantine(book_id: str, target_lang: str, raw_output: str, error_msg: str):
-    """Logs failed responses to configured quarantine log file."""
-    quarantine_log_file = config.resolved_quarantine_log_path
-    quarantine_log_file.parent.mkdir(parents=True, exist_ok=True)
+    """Logs failed responses to logs/quarantine.jsonl."""
     log_entry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "prompt_version": config.prompt_version,
@@ -70,73 +107,116 @@ def log_to_quarantine(book_id: str, target_lang: str, raw_output: str, error_msg
         "error": error_msg,
         "raw_model_output": raw_output,
     }
-    with open(quarantine_log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_entry) + "\n")
+    append_jsonl(config.resolved_quarantine_log_path, log_entry)
 
 
-def parse_and_validate(raw_text: str) -> Tuple[Optional[TranslationResponse], Optional[str]]:
-    """Strips fences, parses JSON, and validates against Pydantic schema."""
+def parse_and_validate(
+    raw_text: str,
+    req_book_id: str,
+    req_target_lang: str,
+) -> Tuple[Optional[TranslationResponse], Optional[str]]:
+    """Strips fences, parses JSON, validates schema, and verifies book_id/target_language match."""
     cleaned = strip_code_fences(raw_text)
+    if not cleaned:
+        return None, "Empty completion content returned by model"
+
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError as e:
         return None, f"JSON Decode Error: {str(e)}"
 
+    if not isinstance(data, dict):
+        return None, f"JSON output must be an object, got {type(data).__name__}"
+
     try:
         validated = TranslationResponse.model_validate(data)
-        return validated, None
     except ValidationError as e:
         return None, f"Pydantic Validation Error: {str(e)}"
 
+    if validated.book_id != req_book_id:
+        return None, f"Book ID mismatch: Model returned '{validated.book_id}', expected '{req_book_id}'"
 
-def call_with_retry(client: OpenAI, messages: list) -> Tuple[str, Dict[str, int]]:
-    """Calls model with configurable timeout, exponential backoff + jitter on 429/5xx, and instant fail on 400/401/403."""
+    if validated.target_language.value != req_target_lang:
+        return None, f"Target language mismatch: Model returned '{validated.target_language.value}', expected '{req_target_lang}'"
+
+    return validated, None
+
+
+def call_with_retry(
+    client: OpenAI,
+    messages: list,
+    overall_start_time: float,
+) -> Tuple[str, Dict[str, int]]:
+    """Calls model with strict overall wall-clock deadline enforcement and backoff on 429/5xx only."""
     max_retries = config.max_network_retries
     for attempt in range(max_retries + 1):
+        elapsed_so_far = time.time() - overall_start_time
+        remaining_timeout = config.timeout_seconds - elapsed_so_far
+        if remaining_timeout <= 0:
+            logger.error(f"Overall request timeout deadline reached ({elapsed_so_far:.2f}s >= {config.timeout_seconds}s)")
+            raise APITimeoutError(request=None)
+
         try:
             response = client.chat.completions.create(
                 model=config.llm_model,
                 messages=messages,
                 temperature=0.0,
-                timeout=config.timeout_seconds,
+                timeout=max(0.1, remaining_timeout),
             )
-            raw_text = response.choices[0].message.content or ""
+
+            total_elapsed = time.time() - overall_start_time
+            # HARD OVERALL WALL-CLOCK TIMEOUT CHECK:
+            if total_elapsed > config.timeout_seconds:
+                logger.error(f"Overall request duration ({total_elapsed:.2f}s) exceeded configured timeout ({config.timeout_seconds}s)")
+                raise APITimeoutError(request=None)
+
+            if not response.choices:
+                raise ValueError("Model provider returned empty choices array")
+
+            choice = response.choices[0]
+            raw_text = getattr(choice.message, "content", None) or ""
+
             usage = {
                 "prompt_tokens": getattr(response.usage, "prompt_tokens", 0) if response.usage else 0,
                 "completion_tokens": getattr(response.usage, "completion_tokens", 0) if response.usage else 0,
             }
             return raw_text, usage
         except (AuthenticationError, BadRequestError, PermissionDeniedError) as err:
-            # Immediate fail: Never retry on 400, 401, 403!
             raise err
         except (APITimeoutError, APIStatusError) as err:
-            if attempt == max_retries:
+            is_retriable = isinstance(err, APITimeoutError) or (
+                isinstance(err, APIStatusError) and err.status_code in (429, 500, 502, 503, 504)
+            )
+
+            if not is_retriable or attempt == max_retries:
                 raise err
-            # Check for Retry-After header on 429
+
             retry_after = None
             if isinstance(err, APIStatusError) and err.status_code == 429:
                 headers = getattr(err.response, "headers", {})
                 retry_after_hdr = headers.get("retry-after") or headers.get("Retry-After")
-                if retry_after_hdr and retry_after_hdr.isdigit():
-                    retry_after = float(retry_after_hdr)
+                if retry_after_hdr:
+                    try:
+                        retry_after = float(retry_after_hdr)
+                    except ValueError:
+                        pass
 
-            if retry_after is not None:
-                sleep_time = retry_after
+            if retry_after is not None and retry_after > 0:
+                sleep_time = min(retry_after, 10.0)
             else:
-                # Exponential backoff with jitter: 1s, 2s, 4s + random(0, 0.5)
                 sleep_time = (2 ** attempt) + random.uniform(0.0, 0.5)
+
+            if (time.time() - overall_start_time + sleep_time) >= config.timeout_seconds:
+                logger.error("Backoff sleep duration would exceed overall request timeout cap")
+                raise APITimeoutError(request=None)
+
             time.sleep(sleep_time)
 
 
 def call_llm_translate(book_id: str, title: str, description: str, target_lang: str) -> TranslationResponse:
-    """Executes LLM translation with Stage 3 & 4 pipeline: timeout, retries, cost log, repair, quarantine."""
-    start_time = time.time()
-    client = OpenAI(
-        base_url=config.llm_base_url,
-        api_key=config.llm_api_key,
-        timeout=config.timeout_seconds,
-        max_retries=0,  # Explicitly handled by custom backoff loop
-    )
+    """Executes LLM translation with Stage 3 & 4 pipeline: overall 30s timeout cap, retries, cost log, repair, quarantine."""
+    overall_start_time = time.time()
+    client = get_client()
     system_prompt = load_system_prompt()
 
     user_payload = json.dumps({
@@ -154,42 +234,76 @@ def call_llm_translate(book_id: str, title: str, description: str, target_lang: 
     total_prompt_tokens = 0
     total_completion_tokens = 0
 
-    # --- Attempt 1 ---
-    raw_output1, usage1 = call_with_retry(client, messages)
-    total_prompt_tokens += usage1.get("prompt_tokens", 0)
-    total_completion_tokens += usage1.get("completion_tokens", 0)
+    max_repairs = config.max_repair_retries
+    current_messages = list(messages)
+    last_raw_output = ""
+    last_error = ""
 
-    validated_res1, error1 = parse_and_validate(raw_output1)
+    try:
+        for repair_attempt in range(max_repairs + 1):
+            if (time.time() - overall_start_time) >= config.timeout_seconds:
+                logger.error("Overall request timeout deadline reached before repair attempt")
+                raise APITimeoutError(request=None)
 
-    if validated_res1:
-        duration_ms = (time.time() - start_time) * 1000.0
-        log_cost(config.llm_model, config.prompt_version, total_prompt_tokens, total_completion_tokens, duration_ms, repaired=False)
-        return validated_res1
+            raw_output, usage = call_with_retry(client, current_messages, overall_start_time)
+            total_prompt_tokens += usage.get("prompt_tokens", 0)
+            total_completion_tokens += usage.get("completion_tokens", 0)
+            last_raw_output = raw_output
 
-    # --- Attempt 2: Repair Retry (Once and only once) ---
-    repair_instruction = (
-        f"Your previous answer was rejected for this reason: {error1}\n"
-        f"Original raw answer was:\n{raw_output1}\n"
-        f"Return ONLY corrected JSON matching the schema."
-    )
-    repair_messages = list(messages) + [
-        {"role": "assistant", "content": raw_output1},
-        {"role": "user", "content": repair_instruction},
-    ]
+            validated, error_msg = parse_and_validate(raw_output, book_id, target_lang)
+            if validated:
+                duration_ms = (time.time() - overall_start_time) * 1000.0
+                log_cost(
+                    config.llm_model,
+                    config.prompt_version,
+                    total_prompt_tokens,
+                    total_completion_tokens,
+                    duration_ms,
+                    repaired=(repair_attempt > 0),
+                    success=True,
+                )
+                return validated
 
-    raw_output2, usage2 = call_with_retry(client, repair_messages)
-    total_prompt_tokens += usage2.get("prompt_tokens", 0)
-    total_completion_tokens += usage2.get("completion_tokens", 0)
+            last_error = error_msg or "Validation error"
 
-    validated_res2, error2 = parse_and_validate(raw_output2)
+            if repair_attempt < max_repairs:
+                repair_instruction = (
+                    f"Your previous answer was rejected for this reason: {last_error}\n"
+                    f"Original raw answer was:\n{raw_output}\n"
+                    f"Return ONLY corrected JSON matching the schema for book_id '{book_id}' and target_language '{target_lang}'."
+                )
+                current_messages.append({"role": "assistant", "content": raw_output})
+                current_messages.append({"role": "user", "content": repair_instruction})
 
-    if validated_res2:
-        duration_ms = (time.time() - start_time) * 1000.0
-        log_cost(config.llm_model, config.prompt_version, total_prompt_tokens, total_completion_tokens, duration_ms, repaired=True)
-        return validated_res2
+        # --- Quarantine on exhausted repair attempts ---
+        duration_ms = (time.time() - overall_start_time) * 1000.0
+        log_cost(
+            config.llm_model,
+            config.prompt_version,
+            total_prompt_tokens,
+            total_completion_tokens,
+            duration_ms,
+            repaired=True,
+            success=False,
+        )
+        log_to_quarantine(book_id, target_lang, last_raw_output, f"Validation failed after {max_repairs} repair attempts: {last_error}")
+        raise ValueError(f"Model output failed validation after {max_repairs} repair attempt(s): {last_error}")
 
-    # --- Quarantine on double failure ---
-    duration_ms = (time.time() - start_time) * 1000.0
-    log_cost(config.llm_model, config.prompt_version, total_prompt_tokens, total_completion_tokens, duration_ms, repaired=True)
-    log_to_quarantine(book_id, target_lang, raw_output2, f"Attempt 1 err: {error1} | Attempt 2 err: {error2}")
-    raise ValueError(f"Model output failed validation after 1 repair attempt: {error2}")
+    except APITimeoutError as timeout_err:
+        duration_ms = (time.time() - overall_start_time) * 1000.0
+        log_cost(
+            config.llm_model,
+            config.prompt_version,
+            total_prompt_tokens,
+            total_completion_tokens,
+            duration_ms,
+            repaired=False,
+            success=False,
+        )
+        log_to_quarantine(
+            book_id,
+            target_lang,
+            last_raw_output,
+            f"LLM model call timed out after {config.timeout_seconds} seconds",
+        )
+        raise timeout_err
