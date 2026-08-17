@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FlyRank Executive Book Inventory & Analytics Report</title>
+    <!-- FL-05 Identity Kit Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* FL-05 Identity Kit Design System Tokens */
+        :root {
+            --color-accent: #0284c7;       /* Sky Blue */
+            --color-accent-soft: #e0f2fe;  /* Light Sky */
+            --color-text: #0f172a;         /* Slate 900 */
+            --color-text-muted: #64748b;   /* Slate 500 */
+            --color-bg: #f8fafc;           /* Slate 50 */
+            --color-card-bg: #ffffff;      /* White Surface */
+            --color-border: #e2e8f0;       /* Slate 200 */
+        }
+
+        /* Print Optimization Rules */
+        @page {
+            size: A4;
+            margin: 16mm 14mm 16mm 14mm;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--color-text);
+            background-color: #ffffff;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* Header Branding Component */
+        .brand-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--color-accent);
+            margin-bottom: 24px;
+        }
+
+        .brand-logo-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .monogram-badge {
+            width: 38px;
+            height: 38px;
+            background-color: var(--color-text);
+            border: 2px solid var(--color-accent);
+            border-radius: 8px;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-titles h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--color-text);
+        }
+
+        .header-titles p {
+            margin: 2px 0 0 0;
+            font-size: 11px;
+            color: var(--color-text-muted);
+        }
+
+        .report-badge {
+            background-color: var(--color-accent-soft);
+            color: #0369a1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            border: 1px solid #bae6fd;
+        }
+
+        /* Executive KPI Summary Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background-color: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .kpi-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .kpi-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        .kpi-value.highlight {
+            color: var(--color-accent);
+        }
+
+        /* Section Headings */
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--color-text);
+            margin: 20px 0 10px 0;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        /* Data Tables Styling */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 11px;
+        }
+
+        table.data-table th {
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            font-weight: 700;
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 2px solid var(--color-border);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        table.data-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--color-border);
+            color: var(--color-text);
+        }
+
+        table.data-table tr:nth-child(even) {
+            background-color: #fdfefe;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .num {
+            text-align: right;
+        }
+
+        .star-rating {
+            color: #f59e0b; /* Amber 500 */
+            font-weight: 600;
+        }
+
+        /* Essential Print CSS Controls for Multi-Page Tables */
+        thead {
+            display: table-header-group;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .two-col-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .footer-note {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid var(--color-border);
+            font-size: 10px;
+            color: var(--color-text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Component -->
+    <div class="brand-header">
+        <div class="brand-logo-title">
+            <div class="monogram-badge">TD</div>
+            <div class="header-titles">
+                <h1>FlyRank Book Analytics & Inventory Report</h1>
+                <p>Generated on <span class="mono">{{ generated_at }}</span> • Live DB Engine</p>
+            </div>
+        </div>
+        <div class="report-badge">CONFIDENTIAL • EXECUTIVE SUMMARY</div>
+    </div>
+
+    <!-- Executive KPI Grid -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Catalog Titles</div>
+            <div class="kpi-value">{{ summary.total_books }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Average Book Price</div>
+            <div class="kpi-value highlight">£{{ "%.2f"|format(summary.avg_price) }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Stock Quantity</div>
+            <div class="kpi-value">{{ summary.total_stock }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Inventory Valuation</div>
+            <div class="kpi-value highlight">£{{ "%.2f"|format(summary.total_value) }}</div>
+        </div>
+    </div>
+
+    <!-- Top 5 Premium Inventory Table -->
+    <div class="section-title">Top 5 Premium Catalog Items</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 15%;">UPC</th>
+                <th style="width: 40%;">Title</th>
+                <th style="width: 20%;">Category</th>
+                <th style="width: 10%;" class="num">Rating</th>
+                <th style="width: 15%;" class="num">Price (GBP)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for book in top_5_expensive %}
+            <tr>
+                <td class="mono">{{ book.upc }}</td>
+                <td><strong>{{ book.title }}</strong></td>
+                <td>{{ book.category }}</td>
+                <td class="num star-rating">{{ book.rating }} ★</td>
+                <td class="num mono">£{{ "%.2f"|format(book.price) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Rating & Category Breakdown Side-by-Side -->
+    <div class="two-col-grid">
+        <div>
+            <div class="section-title">Distribution by Rating</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Rating Tier</th>
+                        <th class="num">Books</th>
+                        <th class="num">Avg Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rating_breakdown %}
+                    <tr>
+                        <td class="star-rating">{{ r.rating }} Stars</td>
+                        <td class="num mono">{{ r.count }}</td>
+                        <td class="num mono">£{{ "%.2f"|format(r.avg_price) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <div class="section-title">Distribution by Category</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th class="num">Stock</th>
+                        <th class="num">Avg Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in category_breakdown %}
+                    <tr>
+                        <td><strong>{{ c.category }}</strong></td>
+                        <td class="num mono">{{ c.total_stock }}</td>
+                        <td class="num mono">£{{ "%.2f"|format(c.avg_price) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Complete Inventory Long Table (Demonstrates Multi-page Table with Print CSS) -->
+    <div class="section-title">Complete Catalog Inventory ({{ all_books|length }} Records)</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 15%;">UPC</th>
+                <th style="width: 45%;">Book Title</th>
+                <th style="width: 20%;">Category</th>
+                <th style="width: 10%;" class="num">Stock</th>
+                <th style="width: 10%;" class="num">Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for book in all_books %}
+            <tr>
+                <td class="mono">{{ book.upc }}</td>
+                <td>{{ book.title }}</td>
+                <td>{{ book.category }}</td>
+                <td class="num mono">{{ book.stock }}</td>
+                <td class="num mono">£{{ "%.2f"|format(book.price) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer-note">
+        <span>FlyRank Backend Track • Assignment A8 PDF Generator</span>
+        <span>Page 1 of 2</span>
+    </div>
+
+</body>
+</html>

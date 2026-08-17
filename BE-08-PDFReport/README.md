@@ -108,10 +108,10 @@ Before writing implementation code, we define our test criteria across 6 testing
   - [x] Write SQL queries for KPIs, Top 5, Rating Breakdown, Category Breakdown
   - [x] Checkpoint 2: Run `pytest test_aggregations.py`
 
-- [ ] **Step 3: Decoupled Jinja2 HTML Template & Print CSS**
-  - [ ] Create `templates/report_template.html` using **FL-05 Identity Kit**
-  - [ ] Implement Print CSS (`@page`, `break-inside: avoid`, repeating `<thead>`)
-  - [ ] Checkpoint 3: Verify HTML rendering with sample data
+- [x] **Step 3: Decoupled Jinja2 HTML Template & Print CSS**
+  - [x] Create `templates/report_template.html` using **FL-05 Identity Kit**
+  - [x] Implement Print CSS (`@page`, `break-inside: avoid`, repeating `<thead>`)
+  - [x] Checkpoint 3: Run `pytest test_template.py`
 
 - [ ] **Step 4: PDF Generation Engine & Storage**
   - [ ] Implement Playwright Chromium rendering engine (`pdf_generator.py`)
