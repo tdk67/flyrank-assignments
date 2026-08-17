@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
+
+# Database & Artifacts (Must NOT be committed)
+*.db
+reports/
+*.pdf
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+
+*.pdf
+
