@@ -97,11 +97,11 @@ Before writing implementation code, we define our test criteria across 6 testing
   - [x] Create minimal `main.py` with `/health` endpoint
   - [x] Checkpoint 0: Verify `/health` endpoint returns 200 OK
 
-- [ ] **Step 1: Database & Performance Indexing**
-  - [ ] Connect to `BE-06-Scraper` SQLite database (`flyrank_scraper.db`)
-  - [ ] Initialize `reports` metadata table
-  - [ ] Add SQL performance indexes (`idx_books_category`, `idx_books_rating`, `idx_books_price`)
-  - [ ] Checkpoint 1: Run `db.py` verification test
+- [x] **Step 1: Database & Performance Indexing**
+  - [x] Create `config.json` and strict `config.py` without hardcoded fallbacks
+  - [x] Create standalone `setup_db.py` script for one-time table & index setup
+  - [x] Implement runtime `db.py` with human-readable error messages
+  - [x] Checkpoint 1: Run `setup_db.py` and `pytest test_db.py`
 
 - [ ] **Step 2: SQL Aggregation Queries**
   - [ ] Implement `get_report_data()` in `aggregations.py`
