@@ -103,10 +103,10 @@ Before writing implementation code, we define our test criteria across 6 testing
   - [x] Implement runtime `db.py` with human-readable error messages
   - [x] Checkpoint 1: Run `setup_db.py` and `pytest test_db.py`
 
-- [ ] **Step 2: SQL Aggregation Queries**
-  - [ ] Implement `get_report_data()` in `aggregations.py`
-  - [ ] Write SQL queries for KPIs, Top 5, Rating Breakdown, Category Breakdown
-  - [ ] Checkpoint 2: Run test script outputting structured JSON metrics
+- [x] **Step 2: SQL Aggregation Queries**
+  - [x] Implement `get_report_data()` in `aggregations.py`
+  - [x] Write SQL queries for KPIs, Top 5, Rating Breakdown, Category Breakdown
+  - [x] Checkpoint 2: Run `pytest test_aggregations.py`
 
 - [ ] **Step 3: Decoupled Jinja2 HTML Template & Print CSS**
   - [ ] Create `templates/report_template.html` using **FL-05 Identity Kit**
