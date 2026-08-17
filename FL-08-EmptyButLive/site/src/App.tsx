@@ -1,12 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { CaseCategory } from './types';
+import { CASE_STUDIES } from './data/caseStudies';
+import { ProjectCard } from './components/ProjectCard';
 
 const App: React.FC = () => {
+  // State 1: Active Category Filter
+  const [activeCategory, setActiveCategory] = useState<CaseCategory>('all');
+
+  // Filter case studies based on active tab
+  const filteredCases = CASE_STUDIES.filter(item => {
+    if (activeCategory === 'all') return true;
+    return item.category === activeCategory;
+  });
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FBF8F2] text-slate-900 antialiased">
-      {/* Sticky Header */}
+    <div className="min-h-screen flex flex-col bg-[#FBF8F2] text-slate-900 antialiased selection:bg-sky-200 selection:text-sky-900">
+      {/* Sticky Navigation Bar */}
       <header className="sticky top-0 z-40 bg-[#FBF8F2]/90 backdrop-blur-md border-b border-amber-900/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
+            
             {/* Monogram Brand */}
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm border border-sky-400/30 shadow-sm">
@@ -22,7 +35,6 @@ const App: React.FC = () => {
             <div className="flex items-center space-x-6">
               <a href="#about" className="text-slate-700 hover:text-sky-700 font-medium transition-colors">About</a>
               <a href="#work" className="text-slate-700 hover:text-sky-700 font-medium transition-colors">Work</a>
-              <a href="#ethos" className="text-slate-700 hover:text-sky-700 font-medium transition-colors">Ethos</a>
               <a 
                 href="https://www.linkedin.com/in/tdeak67" 
                 target="_blank" 
@@ -36,15 +48,16 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Hero Container */}
+      {/* Main Container */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
         
         {/* Hero Section */}
         <section id="about" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          
           <div className="lg:col-span-7 space-y-6 text-left">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100/80 border border-amber-300/60 text-amber-900 text-xs font-semibold shadow-sm">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-              FL-08 Empty But Live Shell • Vercel Ready
+              FL-08 React + TypeScript Shell • Vercel Live
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
@@ -80,7 +93,7 @@ const App: React.FC = () => {
                 href="#work" 
                 className="px-6 py-3 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-semibold shadow-sm transition-all"
               >
-                View Case Studies Structure
+                Explore Curated Work
               </a>
             </div>
           </div>
@@ -89,12 +102,12 @@ const App: React.FC = () => {
           <div className="lg:col-span-5 flex justify-center relative">
             <div className="relative group w-full max-w-sm transform -rotate-2 hover:rotate-0 transition-transform duration-500">
               <div className="bg-white p-5 rounded-3xl shadow-xl border border-amber-900/10 space-y-4">
-                <div className="aspect-square w-full rounded-2xl bg-slate-800 text-white flex flex-col items-center justify-center p-6 text-center shadow-inner">
+                <div className="aspect-square w-full rounded-2xl bg-slate-900 text-white flex flex-col items-center justify-center p-6 text-center shadow-inner">
                   <div className="w-16 h-16 rounded-full bg-sky-600 text-white font-bold text-2xl flex items-center justify-center mb-3 shadow-md">
                     TD
                   </div>
                   <h3 className="font-bold text-lg">Tamas Deak</h3>
-                  <p className="text-xs text-sky-300 font-mono mt-1">Senior Systems Architect</p>
+                  <p className="text-xs text-sky-300 font-mono mt-1">30+ Years Backend Engineering</p>
                   <p className="text-xs text-slate-400 mt-2 font-mono">portfolio.taskmind-ai.com</p>
                 </div>
                 <div className="text-center pt-1">
@@ -107,28 +120,56 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Section Containers Prepared for Build Week */}
-        <section id="work" className="py-10 border-t border-slate-200/80 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-900">Curated Work (Build Week Container)</h2>
-            <span className="text-xs font-mono bg-sky-100 text-sky-800 px-3 py-1 rounded-full font-semibold">FL-04 & FL-07 Mapped</span>
+        {/* Curated Work Section with Dynamic Category Filter State */}
+        <section id="work" className="py-10 border-t border-slate-200/80 space-y-8">
+          
+          {/* Header & Filter Tabs */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Curated Work & Engineering Proof</h2>
+              <p className="text-sm text-slate-600 mt-1">Lead case studies framed around hard technical proof, zero prompt injection, and zero schema drift.</p>
+            </div>
+
+            {/* Interactive Category Filter Buttons (useState in Action) */}
+            <div className="inline-flex p-1 rounded-2xl bg-slate-200/70 border border-slate-300/80 self-start sm:self-auto font-mono text-xs font-semibold">
+              <button
+                onClick={() => setActiveCategory('all')}
+                className={`px-4 py-2 rounded-xl transition-all ${
+                  activeCategory === 'all'
+                    ? 'bg-white text-slate-900 shadow-sm font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Work ({CASE_STUDIES.length})
+              </button>
+              <button
+                onClick={() => setActiveCategory('rag')}
+                className={`px-4 py-2 rounded-xl transition-all ${
+                  activeCategory === 'rag'
+                    ? 'bg-sky-600 text-white shadow-sm font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Enterprise RAG & AI
+              </button>
+              <button
+                onClick={() => setActiveCategory('backend')}
+                className={`px-4 py-2 rounded-xl transition-all ${
+                  activeCategory === 'backend'
+                    ? 'bg-slate-900 text-white shadow-sm font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Backend & Infra
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <span className="text-xs font-mono font-bold text-sky-600">CASE 1 (LEAD)</span>
-              <h3 className="font-bold text-slate-900">Agentic RAG CV Matcher</h3>
-              <p className="text-sm text-slate-600">4-agent validator loop, section-aware chunking, 0% prompt injection leaks.</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <span className="text-xs font-mono font-bold text-sky-600">CASE 2</span>
-              <h3 className="font-bold text-slate-900">Pi Agent-to-Agent Mesh</h3>
-              <p className="text-sm text-slate-600">Dual-model routing, HMAC cryptographic payload signing over fasta2a protocol.</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <span className="text-xs font-mono font-bold text-sky-600">CASE 3</span>
-              <h3 className="font-bold text-slate-900">Containerized FastAPI Microservice</h3>
-              <p className="text-sm text-slate-600">Port/Adapter pattern, gated Liquibase schema migration container, task lifecycle.</p>
-            </div>
+
+          {/* Grid of Case Study Components */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {filteredCases.map(item => (
+              <ProjectCard key={item.id} caseStudy={item} />
+            ))}
           </div>
         </section>
 
@@ -136,7 +177,7 @@ const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-8 text-center text-sm text-slate-600">
-        <p>© 2026 Tamas Deak • FL-08 Empty But Live Project Shell • Hosted on Vercel</p>
+        <p>© 2026 Tamas Deak • FL-08 React + TypeScript Shell • Hosted on Vercel</p>
       </footer>
     </div>
   );

@@ -135,25 +135,39 @@ The project utilizes lightweight, high-performance web libraries. Below is the c
 
 ---
 
-## 7. Deployment Guide (Deploying from Subdirectory)
+## 7. Deployment Guide
 
-Because this project is located in a subdirectory (`FL-08-EmptyButLive/site`) of your main `flyrank-assignments` repository, deploy to Vercel as follows:
+### Primary Method: 1-Click Deployment via Vercel CLI (Recommended)
 
-### Deploying to Vercel via Vercel Web Dashboard
+To deploy directly from your local site directory without dealing with web UI repository selectors:
 
-1. Push your changes to the `flyrank-assignments` repository:
+```bash
+cd c:\Data\work\genAI\FlyrankAI\FL-08-EmptyButLive\site
+npx vercel --prod
+```
+
+**How the CLI authentication flow works:**
+1. If not logged in, running `npx vercel --prod` automatically opens your default web browser to the Vercel authorization page.
+2. Click **Accept / Authorize** in the browser window.
+3. Return to your terminal—Vercel CLI confirms login, uploads the static site directory, and prints your live production URL instantly!
+
+---
+
+### Alternative Method: Deploying via Vercel Web Dashboard
+
+1. Commit and push your changes to your `flyrank-assignments` repository:
    ```bash
    git add .
    git commit -m "feat(FL-08): add static portfolio site under FL-08-EmptyButLive/site"
    git push origin main
    ```
 2. Go to **[vercel.com/new](https://vercel.com/new)** and import your `flyrank-assignments` repository.
-3. In the project setup screen, expand **Root Directory** and select:
-   `FL-08-EmptyButLive/site`
+3. In the project setup screen, expand **Root Directory** and select `FL-08-EmptyButLive/site`.
+   *(Note: If the subdirectory picker list doesn't scroll, zoom out your browser page with `Ctrl` + `-` to see all folders on screen).*
 4. Framework Preset: Select **Other** or **Static HTML**.
 5. Build Command: Leave **EMPTY**.
 6. Output Directory: Leave **EMPTY** (or `./`).
-7. Click **Deploy**. Vercel will deploy your static site instantly in under 5 seconds!
+7. Click **Deploy**.
 
 ---
 

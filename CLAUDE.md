@@ -2,12 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Proof Statement
+"I bring nearly 30 years of software engineering
+experience to build and reliably integrate modern AI features, specifically RAG
+applications, into complex enterprise backend infrastructures. This proof is built for an
+Engineering Manager at a large, international enterprise who needs a veteran developer
+capable of bridging established backend systems with new AI capabilities without
+compromising stability. When they review the code quality and structural integrity of my
+working RAG project, the single action I want them to take is to DM me on LinkedIn to
+discuss an open senior engineering role.
+"
+
+## Honest Why
+"A standard CV lists history and buzzwords, but fails to prove that a veteran engineer can write and deploy functional, production-ready AI code from scratch today."
+
+## Tutor Instructions
+- Act as a candid technical tutor across this build.
+- Challenge unnecessary complexity and emphasize enterprise code quality & stability.
+
+## Two-Line Style Note (Identity Kit)
+- Fonts: Inter (Headings 700, Body 400), JetBrains Mono (Tech Badges). Palette: Accent #0284c7, Text #0f172a, BG #f8fafc, Border #e2e8f0.
+- Mood: Calm precision engineering framing that lets hard technical proof speak loudest without competing visual clutter.
+
 ## Repository overview
 
 This repo holds a series of independent Flyrank backend assignments, each in its own top-level directory. Each assignment is self-contained (own dependencies, own `.gitignore`) and builds on the previous one — read the earlier assignment before modifying a later one that says it extends it.
 
 - `BE-01-FastAPI/` — assignment BE-01. A minimal single-file FastAPI service (`main.py`) with `POST /user` and `GET /user/{user_id}`, backed by an in-memory dict. No database, no persistence across restarts.
 - `BE-04-Containerize/` — assignment BE-04. Takes BE-01 and upgrades it to a layered, containerized service backed by PostgreSQL, with Liquibase-managed migrations, plus a new `Task` domain (assignment/status lifecycle). This is the actively developed project; BE-01 is left as-is as a historical reference.
+- `FL-03-Sitemap/` — not a code project. Design/planning deliverable (portfolio sitemap + Claude Project setup write-up) for `portfolio.taskmind-ai.com`. No dependencies, build, or tests — see the dedicated section below.
 
 There is no root-level build system, package manifest, or test runner — each assignment directory is independent. Always `cd` into the relevant assignment directory before running any command below.
 
@@ -110,3 +133,15 @@ pytest
 - Changing Postgres credentials in `.env` does not take effect against an existing volume — run `docker compose down -v` then bring `db` back up before re-migrating.
 - If `web` can't find tables, check that `db-migrate` actually completed (`docker compose up --build db-migrate`) before assuming an app-level bug.
 - `UserTaskService.has_assigned_tasks` and the bulk-unassign loop must keep excluding `DONE` tasks — treating a completed task as an "active assignment" would either permanently block deleting anyone who ever finished a task, or silently reset that task back to `PLANNED` and erase `end_date` just to unblock the delete. If the FK on `tasks.assignee_user_id` is ever changed away from `ON DELETE SET NULL`, this logic needs to be revisited together, since they were designed as a pair.
+
+---
+
+## FL-03-Sitemap
+
+This directory is a design/planning deliverable, not a codebase — there is nothing to build, lint, or test here.
+
+- `sitemap_submission.md` — the actual submission: positioning/proof statement, a 4-page portfolio sitemap (`/`, `/work`, `/about`, LinkedIn DM as the single conversion action) for `portfolio.taskmind-ai.com`, the custom instructions pasted into a dedicated Claude Project used to pressure-test the sitemap, and the resulting refinement (pin an "Enterprise RAG & Infrastructure" filter at the top of the site; demote casual side projects to a secondary "Explorations" section).
+- `sitemap_sketch.excalidraw` / `sitemap_sketch.png` — the Excalidraw canvas behind the sitemap diagram referenced in the submission doc, and its exported image.
+- `claude_project_screenshot.png` — screenshot of the configured Claude Project referenced in the submission doc.
+
+Note: `sitemap_submission.md` titles itself "FL-01 Assignment" even though the directory is named `FL-03-Sitemap`, and its Excalidraw file links point at a sibling `Fl-01-Workflow-Audit/` path rather than this directory. If asked to edit this deliverable, confirm with the user which assignment number/location is authoritative before renaming or moving anything.

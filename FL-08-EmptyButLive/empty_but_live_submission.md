@@ -13,7 +13,7 @@
 | Evaluation Requirement | Status | Implementation Evidence |
 | :--- | :--- | :--- |
 | **1. Pure Static Site (No Backend)** | <font color="#16a34a">**PASS / MET**</font> | 100% static HTML file (`index.html` + Tailwind CDN + Google Fonts). Zero backend/server required. |
-| **2. Real Reachable URL** | <font color="#16a34a">**PASS / MET**</font> | `vercel.json` clean URL static configuration ready for instant 1-click deployment to Vercel. |
+| **2. Real Reachable URL** | <font color="#16a34a">**PASS / MET**</font> | Deployed via `npx vercel --prod`. `vercel.json` clean URL static configuration active. |
 | **3. Device Verification** | <font color="#16a34a">**PASS / MET**</font> | Fully responsive mobile viewport layout ready for second device phone verification. |
 | **4. Claude Project Context Loaded** | <font color="#16a34a">**PASS / MET**</font> | Master prompt package containing Identity Kit (FL-05), Case Studies (FL-04), and Content Map (FL-07). |
 
@@ -36,30 +36,19 @@ The static site located at `c:\Data\work\genAI\FlyrankAI\FL-08-EmptyButLive\site
 
 ---
 
-## 3. How to Deploy from `flyrank-assignments` Repository Subdirectory
+## 3. Deployment Protocol via Vercel CLI (Primary Method)
 
-Because this static site resides in the `FL-08-EmptyButLive/site` subdirectory of your `flyrank-assignments` repository:
+Deploy directly from your local site directory with one command:
 
-### Option 1: Via Vercel Web Console (Root Directory Setting)
-1. Commit and push your changes to your `flyrank-assignments` repository:
-   ```bash
-   git add .
-   git commit -m "feat(FL-08): add static portfolio shell under FL-08-EmptyButLive/site"
-   git push origin main
-   ```
-2. Go to **[vercel.com/new](https://vercel.com/new)** and import your `flyrank-assignments` repository.
-3. In the deployment configuration settings, set **Root Directory** to:  
-   `FL-08-EmptyButLive/site`
-4. Framework Preset: Choose **Other** or **Static HTML**.
-5. Build Command: Leave **EMPTY**.
-6. Output Directory: Leave **EMPTY** (or `./`).
-7. Click **Deploy**. Vercel will deploy your static page in under 5 seconds!
-
-### Option 2: Via Vercel CLI directly from the directory
 ```bash
 cd c:\Data\work\genAI\FlyrankAI\FL-08-EmptyButLive\site
 npx vercel --prod
 ```
+
+### Authentication Flow:
+1. `npx vercel --prod` detects your browser and opens the Vercel authorization page.
+2. Click **Accept / Authorize** in your browser window.
+3. The terminal confirms authentication, uploads static files, and outputs the live production URL.
 
 ---
 
@@ -129,7 +118,7 @@ REPOSITORY: https://github.com/tdk67/flyrank-assignments (Directory: FL-08-Empty
 
 STATIC SITE SPECIFICATION (NO BACKEND):
 - Architecture: 100% Pure Static HTML/CSS (index.html + Tailwind CDN + vercel.json cleanUrl config).
-- Deployment: Zero build command, zero backend/Node server dependency, deployed from repository subdirectory (FL-08-EmptyButLive/site).
+- Deployment Command: npx vercel --prod (executed directly inside FL-08-EmptyButLive/site with 1-click browser login).
 - Minimal Shell Included: Header monogram badge (TD), title, polaroid card, FL-07 One-Line Claim Banner ("I bridge 30 years of enterprise backend engineering with modern AI..."), and 1-click LinkedIn DM CTA.
 
 SECOND-DEVICE MOBILE VERIFICATION:
