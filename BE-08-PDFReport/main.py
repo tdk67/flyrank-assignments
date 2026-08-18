@@ -45,7 +45,7 @@ app.include_router(reports.router)
 🚀 **FlyRank Live PDF Streaming Monitor**
 
 Click the link below to open the interactive streaming dashboard directly in your browser:
-👉 [**Open Live Streaming Dashboard (/demo)**](/demo)
+👉 [**Open Live Streaming Dashboard**](./demo)
 
 Features real-time `ReadableStream` chunk reading, instant TTFB measurement, and live PDF downloading.
 """
