@@ -313,8 +313,15 @@
         </div>
     </div>
 
-    <!-- Complete Inventory Long Table (Demonstrates Multi-page Table with Print CSS) -->
-    <div class="section-title">Complete Catalog Inventory ({{ all_books|length }} Records)</div>
+    <!-- Complete Inventory Long Table (Demonstrates Multi-page Table with Print CSS & Configurable Cap Limit) -->
+    <div class="section-title">
+        Catalog Inventory (Displaying {{ all_books|length }} of {{ summary.total_books }} Records)
+        {% if is_truncated %}
+        <span style="font-size: 10px; font-weight: 600; color: #d97706; background-color: #fef3c7; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">
+            ⚠️ Configured print limit reached (Max: {{ catalog_limit }})
+        </span>
+        {% endif %}
+    </div>
     <table class="data-table">
         <thead>
             <tr>

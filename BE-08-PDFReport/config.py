@@ -10,6 +10,7 @@ class AppConfig(BaseModel):
     db_path: str = Field(..., description="Path to SQLite database file")
     reports_dir: str = Field(..., description="Directory for storing output PDF reports")
     templates_dir: str = Field(..., description="Directory containing HTML Jinja2 templates")
+    max_catalog_limit: int = Field(default=100, description="Max catalog items to render in PDF report table")
 
     def resolve(self, key: str) -> Path:
         """Generic path resolver: converts relative config paths to absolute Path objects."""

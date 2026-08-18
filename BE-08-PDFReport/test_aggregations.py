@@ -13,6 +13,19 @@ def test_report_data_structure():
     assert "category_breakdown" in data
     assert "top_5_expensive" in data
     assert "all_books" in data
+    assert "catalog_limit" in data
+    assert "is_truncated" in data
+
+
+def test_configurable_catalog_limit():
+    """Verify catalog limit parameter caps rendered items and sets truncation flag."""
+    # Test with custom small limit of 5 items
+    data = get_report_data(limit=5)
+
+    assert data["catalog_limit"] == 5
+    assert len(data["all_books"]) <= 5
+    if data["summary"]["total_books"] > 5:
+        assert data["is_truncated"] is True
 
 
 def test_summary_kpi_math():

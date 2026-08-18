@@ -1,5 +1,6 @@
 {
   "db_path": "../BE-06-Scraper/flyrank_scraper.db",
   "reports_dir": "reports",
-  "templates_dir": "templates"
+  "templates_dir": "templates",
+  "max_catalog_limit": 100
 }

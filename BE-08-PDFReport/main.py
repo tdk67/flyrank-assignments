@@ -1,4 +1,16 @@
+"""
+BE-08 PDF Report Generator Application Entry Point.
+Clean, layered FastAPI application including routers for Health and Reports.
+Contains ZERO SQL statements or database logic.
+"""
+import sys
+import asyncio
 from fastapi import FastAPI
+from routers import health, reports
+
+# Ensure Windows Proactor Event Loop Policy for Playwright Subprocess Transport
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 app = FastAPI(
     title="BE-08 PDF Report Generator API",
@@ -6,13 +18,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@app.get("/health")
-def health_check():
-    """Minimal health check endpoint to verify server setup."""
-    return {
-        "status": "ok",
-        "app": "BE-08 PDF Report Generator"
-    }
+# Register Layered Routers
+app.include_router(health.router)
+app.include_router(reports.router)
 
 if __name__ == "__main__":
     import uvicorn
