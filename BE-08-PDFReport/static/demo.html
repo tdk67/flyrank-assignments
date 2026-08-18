@@ -361,7 +361,7 @@
             let chunkCount = 0;
 
             try {
-                const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+                const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '.';
                 const response = await fetch(`${apiBase}/reports/stream?force=${force}`, {
                     method: 'POST'
                 });
