@@ -8,7 +8,7 @@ import asyncio
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from routers import health, reports
 
 # Ensure Windows Proactor Event Loop Policy for Playwright Subprocess Transport
@@ -36,11 +36,23 @@ app.include_router(health.router)
 app.include_router(reports.router)
 
 
-@app.get("/demo", include_in_schema=False)
+@app.get(
+    "/demo",
+    response_class=HTMLResponse,
+    tags=["Demo Dashboard"],
+    summary="Interactive Live PDF Streaming Dashboard",
+    description="""
+🚀 **FlyRank Live PDF Streaming Monitor**
+
+Click the link below to open the interactive streaming dashboard directly in your browser:
+👉 [**Open Live Streaming Dashboard (/demo)**](/demo)
+
+Features real-time `ReadableStream` chunk reading, instant TTFB measurement, and live PDF downloading.
+"""
+)
 def serve_demo_page():
-    """Serves the lightweight HTML live streaming monitor dashboard."""
     demo_path = Path(__file__).parent / "static" / "demo.html"
-    return FileResponse(demo_path)
+    return FileResponse(demo_path, media_type="text/html")
 
 
 if __name__ == "__main__":
