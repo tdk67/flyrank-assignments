@@ -15,7 +15,8 @@ An executive analytics and PDF reporting engine built as part of the FlyRank Bac
 - **Dual Serving Modes**:
   1. **Standard Endpoint** (`POST /reports`): Generates & saves PDF to disk, returning a JSON link (`201 Created`). Supports **Idempotency** (duplicate same-day requests return existing file link with `200 OK`).
   2. **Immediate Streaming Endpoint ("Performance Trick")** (`POST /reports/stream`): Combines generation, DB bookkeeping, and idempotency with instant response streaming. If a report was already generated today, it streams the existing PDF file from disk **instantly (0ms TTFB)**!
-  3. **Control Panel Endpoint** (`GET /reports`): Lists generated report metadata ordered by `created_at DESC`, with optional `limit` filter.
+  3. **Live Streaming Monitor & Demo Page** (`GET /demo`): Lightweight HTML/JS dashboard demonstrating real-time browser chunk reading (`ReadableStream`), live TTFB calculation, chunk counters, PDF preview, and download links.
+  4. **Control Panel Endpoint** (`GET /reports`): Lists generated report metadata ordered by `created_at DESC`, with optional `limit` filter.
 
 ---
 

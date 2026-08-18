@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlyRank PDF Report Streaming Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+            --success-bg: #dcfce7;
+            --success-border: #86efac;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            background: var(--text);
+            color: #fff;
+            font-weight: 800;
+            font-size: 16px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 2px solid var(--primary);
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .card-header {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text);
+            cursor: pointer;
+            text-transform: none;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        button, .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 11px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        button:hover, .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+        }
+
+        .btn-success:hover {
+            background-color: #15803d;
+        }
+
+        .status-banner {
+            display: none;
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            color: #166534;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .metric-box {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 6px;
+            height: 12px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary);
+            transition: width 0.1s linear;
+        }
+
+        .log-box {
+            background: #0f172a;
+            color: #38bdf8;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 12px;
+            border-radius: 8px;
+            height: 140px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+
+        .preview-container {
+            width: 100%;
+            height: 520px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        .actions {
+            margin-top: 14px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-title">
+            <div class="logo-badge">TD</div>
+            <div>
+                <h1>FlyRank PDF Report Streaming Monitor</h1>
+                <p class="subtitle">Immediate Download Start & Live Time-To-First-Byte (TTFB) Reader</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- Control Card -->
+        <div class="card">
+            <div class="card-header">⚡ Test Immediate Streaming</div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="forceGenerate" checked>
+                    Force fresh PDF generation (<code>force=true</code>)
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button id="btnStream" style="flex: 2;" onclick="startStreamingDemo()">▶️ Start Stream Reader Test</button>
+            </div>
+
+            <!-- Instant Download Started Alert Banner -->
+            <div class="status-banner" id="statusBanner">
+                ⚡ DOWNLOAD STARTED IMMEDIATELY! Chunk #1 received. Byte stream active below...
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <div class="metric-value" id="valTTFB">0 ms</div>
+                    <div class="metric-label">TTFB (Chunk #1)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value" id="valTotalTime">0 ms</div>
+                    <div class="metric-label">Total Duration</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value" id="valChunks">0</div>
+                    <div class="metric-label">Chunks Received</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value" id="valIdempotent">-</div>
+                    <div class="metric-label">Idempotent</div>
+                </div>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+
+            <div class="log-box" id="logBox">
+                [Ready] Click 'Start Stream Reader Test' to observe immediate chunk arrival...
+            </div>
+
+            <div class="actions" id="actionBox">
+                <a id="btnDownloadLink" class="btn btn-success" href="#" download="report.pdf">💾 Download Streaming PDF</a>
+            </div>
+        </div>
+
+        <!-- PDF Preview Card -->
+        <div class="card">
+            <div class="card-header">📄 PDF Live Preview</div>
+            <p class="subtitle">Embedded preview renders automatically as soon as binary stream completes.</p>
+            <div class="preview-container" id="previewContainer">
+                <iframe id="pdfFrame"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function startStreamingDemo() {
+            const btn = document.getElementById('btnStream');
+            const force = document.getElementById('forceGenerate').checked;
+            const statusBanner = document.getElementById('statusBanner');
+            const logBox = document.getElementById('logBox');
+            const progressBar = document.getElementById('progressBar');
+            const actionBox = document.getElementById('actionBox');
+            const previewContainer = document.getElementById('previewContainer');
+            const pdfFrame = document.getElementById('pdfFrame');
+            const btnDownloadLink = document.getElementById('btnDownloadLink');
+
+            // Reset UI
+            btn.disabled = true;
+            statusBanner.style.display = 'none';
+            actionBox.style.display = 'none';
+            previewContainer.style.display = 'none';
+            progressBar.style.width = '0%';
+            logBox.innerText = `[1/4] Connecting to POST /reports/stream?force=${force}...\n`;
+
+            document.getElementById('valTTFB').innerText = '...';
+            document.getElementById('valTotalTime').innerText = '...';
+            document.getElementById('valChunks').innerText = '0';
+            document.getElementById('valIdempotent').innerText = '-';
+
+            const startTime = performance.now();
+            let firstChunkTime = null;
+            let chunks = [];
+            let totalBytes = 0;
+            let chunkCount = 0;
+
+            try {
+                const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+                const response = await fetch(`${apiBase}/reports/stream?force=${force}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error ${response.status}`);
+                }
+
+                const isIdempotent = response.headers.get('X-Report-Idempotent') || 'false';
+                const reportId = response.headers.get('X-Report-Id') || 'live';
+                document.getElementById('valIdempotent').innerText = isIdempotent.toUpperCase();
+
+                const reader = response.body.getReader();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    // IMMEDIATELY UPON CHUNK #1 ARRIVAL: Show Download Started Banner & Download Button!
+                    if (!firstChunkTime && value.length > 0) {
+                        firstChunkTime = performance.now();
+                        const ttfbMs = (firstChunkTime - startTime).toFixed(1);
+                        document.getElementById('valTTFB').innerText = `${ttfbMs} ms`;
+                        
+                        // Show immediate success banner
+                        statusBanner.style.display = 'block';
+                        statusBanner.innerText = `⚡ DOWNLOAD STARTED IMMEDIATELY! First chunk received in ${ttfbMs} ms. Byte stream active below...`;
+                        
+                        logBox.innerText += `[2/4] ⚡ DOWNLOAD STARTED IMMEDIATELY! TTFB: ${ttfbMs} ms\n`;
+                    }
+
+                    chunkCount++;
+                    totalBytes += value.length;
+                    chunks.push(value);
+
+                    // Update streaming download link live as chunks arrive
+                    const liveBlob = new Blob(chunks, { type: 'application/pdf' });
+                    btnDownloadLink.href = URL.createObjectURL(liveBlob);
+                    btnDownloadLink.download = `book_analytics_report_${reportId}.pdf`;
+                    actionBox.style.display = 'block';
+
+                    document.getElementById('valChunks').innerText = chunkCount;
+                    const pct = Math.min(100, Math.round((totalBytes / 50000) * 100));
+                    progressBar.style.width = `${pct}%`;
+                    logBox.innerText += ` -> Chunk #${chunkCount}: received ${value.length} bytes (Total: ${totalBytes} bytes)\n`;
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+
+                const totalTimeMs = (performance.now() - startTime).toFixed(1);
+                document.getElementById('valTotalTime').innerText = `${totalTimeMs} ms`;
+                progressBar.style.width = '100%';
+                statusBanner.innerText = `✅ DOWNLOAD & STREAM COMPLETED! Total ${totalBytes.toLocaleString()} bytes received in ${totalTimeMs} ms.`;
+                logBox.innerText += `\n[3/4] ✅ Stream Complete! Total ${totalBytes} bytes in ${totalTimeMs} ms.\n`;
+
+                // Render Final PDF Preview Frame
+                const finalBlob = new Blob(chunks, { type: 'application/pdf' });
+                pdfFrame.src = URL.createObjectURL(finalBlob);
+                previewContainer.style.display = 'block';
+
+                logBox.innerText += `[4/4] PDF Live Preview ready.\n`;
+                logBox.scrollTop = logBox.scrollHeight;
+
+            } catch (err) {
+                logBox.innerText += `\n❌ Error: ${err.message}\n`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

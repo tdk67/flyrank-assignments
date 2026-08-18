@@ -17,6 +17,13 @@ def test_health_endpoint():
     assert data["books_count"] > 0
 
 
+def test_demo_page_endpoint():
+    """Verify GET /demo serves static/demo.html lightweight streaming monitor."""
+    res = client.get("/demo")
+    assert res.status_code == 200
+    assert "FlyRank PDF Report Streaming Monitor" in res.text
+
+
 def test_list_reports_endpoint():
     """Verify GET /reports returns list of generated report metadata with optional limit."""
     # Generate at least 1 report
