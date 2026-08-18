@@ -280,7 +280,9 @@
 
             <div class="btn-group">
                 <button id="btnStream" style="flex: 2;" onclick="startStreamingDemo()">▶️ Start Stream Reader Test</button>
+                <button id="btnDeleteAll" style="flex: 1; background-color: #ef4444;" onclick="deleteAllReports()">🗑️ Delete All</button>
             </div>
+
 
             <!-- Instant Download Started Alert Banner -->
             <div class="status-banner" id="statusBanner">
@@ -430,6 +432,31 @@
                 btn.disabled = false;
             }
         }
+
+        async function deleteAllReports() {
+            if (!confirm("Are you sure you want to delete ALL generated reports from database and disk?")) return;
+            const logBox = document.getElementById('logBox');
+            const statusBanner = document.getElementById('statusBanner');
+            logBox.innerText = `[Deleting] Calling DELETE /reports...\n`;
+            try {
+                const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+                const res = await fetch(`${apiBase}/reports`, { method: 'DELETE' });
+                const data = await res.json();
+                logBox.innerText += `\n✅ Deleted ${data.deleted_records} report records and PDF files.\n`;
+                statusBanner.style.display = 'block';
+                statusBanner.innerText = `🗑️ Successfully deleted ${data.deleted_records} report records and PDF files.`;
+                document.getElementById('actionBox').style.display = 'none';
+                document.getElementById('previewContainer').style.display = 'none';
+                document.getElementById('valChunks').innerText = '0';
+                document.getElementById('valTTFB').innerText = '0 ms';
+                document.getElementById('valTotalTime').innerText = '0 ms';
+                document.getElementById('valIdempotent').innerText = '-';
+                document.getElementById('progressBar').style.width = '0%';
+            } catch (err) {
+                logBox.innerText += `\n❌ Delete Error: ${err.message}\n`;
+            }
+        }
     </script>
 </body>
 </html>
+

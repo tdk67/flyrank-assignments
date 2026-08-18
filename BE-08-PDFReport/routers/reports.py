@@ -88,3 +88,16 @@ def get_report_metadata(report_id: str):
 def download_report_file(report_id: str):
     """Download stored PDF report file from disk."""
     return report_service.get_report_file_response(report_id)
+
+
+@router.delete("", status_code=status.HTTP_200_OK)
+def delete_all_reports():
+    """Delete ALL generated report metadata records and clean up PDF files from disk."""
+    return report_service.delete_all_reports()
+
+
+@router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_report_by_id(report_id: str):
+    """Delete a specific report metadata record and its PDF file by ID."""
+    report_service.delete_report_by_id(report_id)
+

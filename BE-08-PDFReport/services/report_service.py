@@ -202,3 +202,43 @@ def get_report_file_response(report_id: str) -> FileResponse:
         )
     finally:
         conn.close()
+
+
+def delete_report_by_id(report_id: str) -> None:
+    """Delete a specific report record by ID and remove its PDF file from disk."""
+    conn = get_db_connection()
+    try:
+        file_path_str = repository.delete_report_by_id(conn, report_id)
+        if not file_path_str:
+            raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found.")
+        file_path = Path(file_path_str)
+        if file_path.exists():
+            file_path.unlink(missing_ok=True)
+    finally:
+        conn.close()
+
+
+def delete_all_reports() -> Dict[str, Any]:
+    """Delete all report records from database and clean up PDF files from disk."""
+    conn = get_db_connection()
+    try:
+        file_paths = repository.delete_all_reports(conn)
+        for path_str in file_paths:
+            p = Path(path_str)
+            if p.exists():
+                p.unlink(missing_ok=True)
+
+        # Also clean up any orphan PDF files in reports/ directory
+        reports_dir = config.resolve("reports_dir")
+        if reports_dir.exists():
+            for f in reports_dir.glob("*.pdf"):
+                f.unlink(missing_ok=True)
+
+        return {
+            "status": "ok",
+            "deleted_records": len(file_paths),
+            "message": f"Successfully deleted {len(file_paths)} report records and cleaned up PDF files."
+        }
+    finally:
+        conn.close()
+

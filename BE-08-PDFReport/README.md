@@ -189,11 +189,15 @@ uvicorn main:app --reload --port 8000
 
 ### API Endpoints
 - `GET /health` — Health check & database connection verification
+- `GET /demo` — **Live Streaming Monitor Dashboard** (Interactive HTML/JS browser interface)
 - `GET /reports` — List generated report metadata records (supports `?limit=N`)
 - `POST /reports` — Generate & store PDF report on disk (Idempotent: returns `200 OK` if existing today, `201 Created` if new)
 - `POST /reports/stream` — **Immediate PDF Streaming Download** (Single-flight locked + instant disk/memory streaming)
 - `GET /reports/{id}` — Retrieve metadata for a specific report
 - `GET /reports/{id}/file` — Download stored PDF report file from disk
+- `DELETE /reports/{id}` — Delete a specific report metadata record and remove its PDF file from disk (`204 No Content`)
+- `DELETE /reports` — **Clean up all report records** from database and disk (`200 OK`)
+
 
 ---
 

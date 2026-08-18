@@ -176,3 +176,25 @@ def list_reports_records(conn: sqlite3.Connection, limit: Optional[int] = None) 
             "SELECT id, report_date, file_path, created_at FROM reports ORDER BY created_at DESC;"
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def delete_report_by_id(conn: sqlite3.Connection, report_id: str) -> Optional[str]:
+    """Delete a report record by ID and return its file_path if deleted, or None if not found."""
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT file_path FROM reports WHERE id = ?;", (report_id,)).fetchone()
+    if not row:
+        return None
+    file_path = row["file_path"]
+    cursor.execute("DELETE FROM reports WHERE id = ?;", (report_id,))
+    conn.commit()
+    return file_path
+
+
+def delete_all_reports(conn: sqlite3.Connection) -> List[str]:
+    """Delete all report records from the database and return list of file_paths to remove."""
+    cursor = conn.cursor()
+    rows = cursor.execute("SELECT file_path FROM reports;").fetchall()
+    file_paths = [r["file_path"] for r in rows]
+    cursor.execute("DELETE FROM reports;")
+    conn.commit()
+    return file_paths

@@ -108,3 +108,35 @@ def test_unknown_report_404():
 
     res_file = client.get("/reports/unknown_id_999/file")
     assert res_file.status_code == 404
+
+
+def test_delete_report_by_id():
+    """Verify DELETE /reports/{report_id} deletes a report row and file from disk."""
+    # 1. Create a fresh report
+    res = client.post("/reports?force=true")
+    report_id = res.json()["id"]
+
+    # 2. Delete the report
+    del_res = client.delete(f"/reports/{report_id}")
+    assert del_res.status_code == 204
+
+    # 3. Verify report is gone (404)
+    assert client.get(f"/reports/{report_id}").status_code == 404
+    assert client.delete(f"/reports/{report_id}").status_code == 404
+
+
+def test_delete_all_reports():
+    """Verify DELETE /reports wipes all report records and PDF files."""
+    # Create 2 reports
+    client.post("/reports?force=true")
+    client.post("/reports?force=true")
+
+    del_res = client.delete("/reports")
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "ok"
+
+    # Verify report list is empty
+    list_res = client.get("/reports")
+    assert list_res.status_code == 200
+    assert len(list_res.json()) == 0
+
