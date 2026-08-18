@@ -8,15 +8,19 @@ An executive analytics and PDF reporting engine built as part of the FlyRank Bac
 
 - **Dataset**: Reuses the SQLite database from `BE-06-Scraper` (`flyrank_scraper.db`).
 - **Brand System**: Designed using **FL-05 Identity Kit** (`Inter` & `JetBrains Mono` fonts, `#0284c7` Sky Blue, `#0f172a` Slate 900, `#f8fafc` Slate 50).
-- **Template Decoupling**: Separation of presentation (`templates/report_template.html`) and backend logic. Design changes require zero backend code edits.
+- **Template Decoupling**: Complete separation of presentation (`templates/report_template.html`) and backend logic. Design changes require zero backend code edits.
+- **Dynamic Page Numbering**: Powered by Playwright Chromium's dynamic footer engine (`<span class="pageNumber"></span> of <span class="totalPages"></span>`), printing accurate page counts on every page header/footer across multi-page reports.
 - **Configurable Catalog Cap**: Prevents bloated multi-page reports for large datasets via `"max_catalog_limit": 100` in `config.json` (renders a truncation badge when exceeded).
-- **Performance at Scale**: SQL aggregations are computed directly in SQLite using indexes (`idx_books_category`, `idx_books_rating`, `idx_books_price`).
+- **Performance at Scale**: SQL aggregations are computed directly in SQLite using performance indexes (`idx_books_category`, `idx_books_rating`, `idx_books_price`).
 - **Single-Flight Concurrency Protection**: Uses `asyncio.Lock()` in `services/report_service.py` to prevent race conditions when multiple concurrent requests hit generation simultaneously.
-- **Dual Serving Modes**:
+- **Dual Serving & Cleanup Modes**:
   1. **Standard Endpoint** (`POST /reports`): Generates & saves PDF to disk, returning a JSON link (`201 Created`). Supports **Idempotency** (duplicate same-day requests return existing file link with `200 OK`).
   2. **Immediate Streaming Endpoint ("Performance Trick")** (`POST /reports/stream`): Combines generation, DB bookkeeping, and idempotency with instant response streaming. If a report was already generated today, it streams the existing PDF file from disk **instantly (0ms TTFB)**!
-  3. **Live Streaming Monitor & Demo Page** (`GET /demo`): Lightweight HTML/JS dashboard demonstrating real-time browser chunk reading (`ReadableStream`), live TTFB calculation, chunk counters, PDF preview, and download links.
-  4. **Control Panel Endpoint** (`GET /reports`): Lists generated report metadata ordered by `created_at DESC`, with optional `limit` filter.
+  3. **Live Streaming Monitor Dashboard** (`GET /demo` & `static/demo.html`): Lightweight HTML/JS dashboard demonstrating real-time browser chunk reading (`ReadableStream`), live TTFB calculation, instant download start notification, embedded PDF preview, and one-click cleanup.
+  4. **Control Panel & Management Endpoints**:
+     - `GET /reports`: Lists generated report metadata ordered by `created_at DESC` (supports `?limit=N`).
+     - `DELETE /reports/{id}`: Deletes a specific report metadata record and its PDF file (`204 No Content`).
+     - `DELETE /reports`: Bulk wipes all report records from database and disk (`200 OK`).
 
 ---
 
@@ -61,7 +65,7 @@ sequenceDiagram
 
 ---
 
-## 🌊 Streaming Mechanics: In-Memory vs. Disk Storage
+## 🌊 Streaming Mechanics & Live Monitor
 
 When calling `POST /reports/stream`:
 
@@ -73,6 +77,11 @@ When calling `POST /reports/stream`:
 2. **Pre-Existing Report Path (Idempotent 0ms TTFB)**:
    - If a report already exists for today, `stream_file_chunks(file_path)` reads the pre-generated file from disk in 8KB chunks.
    - Response headers include `X-Report-Idempotent: true` and start streaming binary bytes **instantly with 0ms Time-To-First-Byte (TTFB)**.
+
+3. **Live Streaming Monitor (`GET /demo`)**:
+   - Open `http://localhost:8000/demo` (or click the interactive link inside Swagger UI at `/docs`).
+   - Uses native browser JavaScript `fetch()` and `response.body.getReader()`.
+   - **Immediate Download Start Banner & Button**: The moment **Chunk #1** arrives, the dashboard displays `⚡ DOWNLOAD STARTED IMMEDIATELY!` and activates the `💾 Download Streaming PDF` button.
 
 ---
 
@@ -87,18 +96,18 @@ When calling `POST /reports/stream`:
 - **Symptom**: `RuntimeError: The starlette.testclient module requires the httpx package to be installed.`
 - **Solution**: Install `httpx` via `pip install httpx` (included in `requirements.txt`).
 
-### 3. Windows Terminal `UnicodeEncodeError` (CP1252 Encoding)
-- **Symptom**: `UnicodeEncodeError: 'charmap' codec can't encode character '\u2705'` when running CLI scripts in PowerShell.
-- **Solution**: Avoid printing raw Unicode emojis directly to stdout. Use standard ASCII markers like `[OK]` and `[ERROR]`.
+### 3. Swagger UI Displays Garbled Text (`Unrecognized response type`) or `.txt` Download
+- **Symptom**: Swagger UI (`/docs`) displays `Unrecognized response type` or downloads `response_...txt`.
+- **Root Cause**: Default OpenAPI schemas document endpoints as returning `application/json` with `Content-Disposition: inline`.
+- **Solution**: Set `response_class=StreamingResponse` and `responses={200: {"content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}}}}` in `routers/reports.py` and set `Content-Disposition: attachment; filename="book_analytics_report_...pdf"`.
 
 ### 4. Database File or `books` Table Missing
 - **Symptom**: `FileNotFoundError: ❌ Database Error: Database file does not exist at '...'` or `RuntimeError: ❌ Mandatory table 'books' is missing...`
 - **Solution**: Verify `BE-06-Scraper` database exists at `../BE-06-Scraper/flyrank_scraper.db`. Run `python setup_db.py` once to initialize the `reports` table and performance indexes.
 
-### 6. Swagger UI Displays Garbled Text (`Unrecognized response type`)
-- **Symptom**: In Swagger UI (`/docs`), calling `POST /reports/stream` shows `Unrecognized response type; displaying content as text.` with binary `%PDF-1.4` text.
-- **Root Cause**: By default, FastAPI's OpenAPI generator documents endpoints as returning `application/json`. Swagger UI therefore sends `Accept: application/json` and attempts to parse raw binary PDF bytes as text/JSON.
-- **Solution**: Explicitly declare `response_class=StreamingResponse` and `responses={200: {"content": {"application/pdf": {}}}}` on `@router.post("/stream")` in `routers/reports.py`. Swagger UI now sends `Accept: application/pdf` and provides a clean **Download File** button and PDF viewer.
+### 5. Playwright Chromium Executable Not Found
+- **Symptom**: `playwright._impl._api_types.Error: Executable doesn't exist at ... chromium`
+- **Solution**: Download the Chromium binary by running: `python -m playwright install chromium`.
 
 ---
 
@@ -112,7 +121,7 @@ When calling `POST /reports/stream`:
 | **`playwright`** | `>=1.35.0` | Headless Chromium Browser Automation library used to render HTML strings into pixel-perfect A4 PDF bytes. |
 | **`pydantic`** | `>=2.0` | Data Validation & Settings Management library powering `AppConfig` in `config.py` and API schemas in `schemas.py`. |
 | **`sqlite3`** | Standard Library | Embedded SQL Database Engine handling data storage, performance indexes, and aggregations (`COUNT`, `AVG`, `SUM`, `GROUP BY`). |
-| **`pytest`** | `>=7.0.0` | Testing framework used for executing the 22-test automated test suite across 6 test modules. |
+| **`pytest`** | `>=7.0.0` | Testing framework used for executing the 25-test automated test suite across 6 test modules. |
 | **`httpx`** | `>=0.24.0` | Async HTTP Client library used internally by FastAPI's `TestClient` for API integration testing. |
 
 ---
@@ -127,18 +136,21 @@ BE-08-PDFReport/
 ├── db.py                       # Database connection factory with dict-like row access & human-readable error checks
 ├── repository.py               # Data Access Layer: Contains ALL raw SQL queries (isolates persistence from business logic)
 ├── aggregations.py             # High-level aggregation convenience wrapper calling repository layer
-├── pdf_generator.py            # PDF Engine: Jinja2 template renderer, Playwright Chromium PDF driver, byte/file chunk stream generators
+├── pdf_generator.py            # PDF Engine: Jinja2 template renderer, Playwright Chromium driver, dynamic page number footer engine
 ├── setup_db.py                 # Standalone maintenance script run ONCE outside app to create reports table & performance indexes
-├── main.py                     # Clean FastAPI application entry point registering health and reports routers (zero SQL)
+├── main.py                     # Clean FastAPI application entry point registering health & reports routers, CORS, and GET /demo
 │
 ├── services/                   # Service Layer (Business Logic & Orchestration)
 │   ├── __init__.py
-│   └── report_service.py       # Core orchestration, single-flight asyncio.Lock concurrency guard, idempotency rules
+│   └── report_service.py       # Core orchestration, single-flight asyncio.Lock concurrency guard, idempotency & delete operations
 │
 ├── routers/                    # Routing Layer (HTTP Concerns & Endpoint Handlers)
 │   ├── __init__.py
 │   ├── health.py               # APIRouter handling GET /health
-│   └── reports.py              # APIRouter handling GET/POST /reports endpoints
+│   └── reports.py              # APIRouter handling GET/POST/DELETE /reports endpoints
+│
+├── static/                     # Static Web Assets
+│   └── demo.html               # Lightweight HTML/JS live streaming monitor dashboard with TTFB & chunk reader
 │
 ├── templates/                  # Presentation Layer
 │   └── report_template.html    # FL-05 Identity Kit styled HTML template with Print CSS page-break rules
@@ -148,7 +160,7 @@ BE-08-PDFReport/
 │   ├── test_aggregations.py    # Unit tests for SQL aggregations, KPI math accuracy, and catalog truncation caps
 │   ├── test_template.py        # Unit tests for Jinja2 rendering, FL-05 brand tokens, and Print CSS rules
 │   ├── test_pdf_generator.py   # Unit tests for Playwright Chromium PDF byte generation (%PDF-1. signature)
-│   ├── test_main.py            # Integration tests for routers, idempotency status codes, file downloading, and streaming
+│   ├── test_main.py            # Integration tests for routers, idempotency, streaming, GET /demo, and DELETE operations
 │   └── test_concurrency.py     # Concurrency test verifying asyncio.Lock single-flight protection under 5 parallel requests
 │
 ├── .gitignore                  # Git exclusion rules (.venv, .db, reports/, *.pdf)
@@ -189,7 +201,7 @@ uvicorn main:app --reload --port 8000
 
 ### API Endpoints
 - `GET /health` — Health check & database connection verification
-- `GET /demo` — **Live Streaming Monitor Dashboard** (Interactive HTML/JS browser interface)
+- `GET /demo` — **Live Streaming Monitor Dashboard** (Interactive browser interface)
 - `GET /reports` — List generated report metadata records (supports `?limit=N`)
 - `POST /reports` — Generate & store PDF report on disk (Idempotent: returns `200 OK` if existing today, `201 Created` if new)
 - `POST /reports/stream` — **Immediate PDF Streaming Download** (Single-flight locked + instant disk/memory streaming)
@@ -197,7 +209,6 @@ uvicorn main:app --reload --port 8000
 - `GET /reports/{id}/file` — Download stored PDF report file from disk
 - `DELETE /reports/{id}` — Delete a specific report metadata record and remove its PDF file from disk (`204 No Content`)
 - `DELETE /reports` — **Clean up all report records** from database and disk (`200 OK`)
-
 
 ---
 
@@ -212,7 +223,7 @@ Run the automated test suite across all 6 test modules:
 ### Test Suite Modules:
 1. **`test_db.py`**: Config loading, generic `resolve()` path resolver, and human-readable error messages.
 2. **`test_aggregations.py`**: SQL aggregation accuracy, KPI math, and catalog truncation limits.
-3. **`test_template.py`**: Jinja2 rendering, FL-05 brand tokens (`#0284c7`, `Inter`, `JetBrains Mono`, TD monogram), and Print CSS rules (`@page`, `break-inside: avoid;`).
+3. **`test_template.py`**: Jinja2 rendering, FL-05 brand tokens (`#0284c7`, `Inter`, `JetBrains Mono`, TD monogram), and Print CSS rules.
 4. **`test_pdf_generator.py`**: Playwright Chromium PDF byte generation and binary `%PDF-1.` magic bytes.
-5. **`test_main.py`**: Integration testing for routers, idempotency status codes, file downloading, and streaming responses.
+5. **`test_main.py`**: Integration testing for routers, idempotency, streaming responses, `GET /demo`, and `DELETE` endpoints.
 6. **`test_concurrency.py`**: Single-flight concurrency locking testing 5 parallel simultaneous requests.

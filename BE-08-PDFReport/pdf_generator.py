@@ -16,6 +16,14 @@ def render_html_template(data: dict, template_name: str = "report_template.html"
     return template.render(**data)
 
 
+FOOTER_TEMPLATE = """
+<div style="font-family: 'Inter', system-ui, -apple-system, sans-serif; font-size: 8.5px; color: #64748b; width: 100%; padding: 0 14mm; display: flex; justify-content: space-between; box-sizing: border-box;">
+    <span>FlyRank Backend Track • Assignment A8 PDF Generator</span>
+    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+</div>
+"""
+
+
 async def _raw_playwright_pdf_render(html_content: str) -> bytes:
     """Internal raw Playwright Chromium PDF generator."""
     async with async_playwright() as p:
@@ -27,10 +35,14 @@ async def _raw_playwright_pdf_render(html_content: str) -> bytes:
         pdf_bytes = await page.pdf(
             format="A4",
             print_background=True,
-            display_header_footer=False
+            display_header_footer=True,
+            header_template="<div style='font-size: 8px;'></div>",
+            footer_template=FOOTER_TEMPLATE,
+            margin={"top": "16mm", "bottom": "16mm", "left": "14mm", "right": "14mm"}
         )
         await browser.close()
         return pdf_bytes
+
 
 
 def _sync_render_with_proactor(html_content: str) -> bytes:
